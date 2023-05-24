@@ -50,12 +50,15 @@ end
 def main
   options = parse_options
   handler = Handler.new(options[:dbname], options[:verbose])
+  finish = false
+  first = true
   Telegram::Bot::Client.run(options[:token]) do |bot|
-    finish = false
     bot.listen do |event|
       finish = handler.process_message(bot, event) if event.class == Telegram::Bot::Types::Message
+      break if finish and not first
+
+      first = false
     end
-    break if finish
   end
   handler.shutdown
 end

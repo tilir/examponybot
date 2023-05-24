@@ -18,11 +18,80 @@ class Handler
     @verbose = verbose
   end
 
+  def check_user(bot, dbuser)
+    if (dbuser.nil?)
+      bot.api.send_message(chat_id: tguser.id, text: "Please register to exam")
+      return -1
+    end
+    return 0
+  end
+
+  def check_priv_user(bot, dbuser)
+    return -1 if (check_user(bot, dbuser) == -1)
+
+    if (dbuser.privlevel != 0)
+      bot.api.send_message(chat_id: tguser.id, text: "Not enough priviledges for the command")
+      return -1
+    end
+    return 0
+  end
+
+  # Priviledged part
+
+  def add_question(bot, tguser, rest)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_priv_user(bot, dbuser) == -1)
+
+    p "add_question: #{rest}" if @verbose
+    re = '(\d+)\s+(\d+)\s+(.+)'
+    m = rest.match(re).to_a
+    n = m[1]
+    v = m[2]
+    t = m[3]
+
+    p "add_question: #{n} #{v} #{t}" if @verbose
+    @dbl.add_question(n, v, t)
+  end
+
+  def all_questions(bot, tguser)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_priv_user(bot, dbuser) == -1)
+
+    bot.api.send_message(chat_id: tguser.id, text: "--- all questions ---")
+    allq = @dbl.all_questions
+    allq.each do |qst|
+      bot.api.send_message(chat_id: tguser.id, text: "#{qst.number} #{qst.variant} #{qst.text}")
+    end
+    bot.api.send_message(chat_id: tguser.id, text: "---")
+  end
+
+  def start_exam(bot, tguser, rest)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_priv_user(bot, dbuser) == -1)
+  end
+
+  def start_review(bot, tguser, rest)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_priv_user(bot, dbuser) == -1)
+  end
+
+  def set_grades(bot, tguser, rest)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_priv_user(bot, dbuser) == -1)
+ end
+
+  # Non-priviledged part
+
   def register_user(bot, tguser, name)
     name = "#{tguser.username}" if name.nil? or name == ""
+    p "register_user: #{name}" if @verbose
 
     # first user added with pedagogical priviledges
-    @dbl.add_user(tguser, 0, name) if @dbl.users_empty?
+    if @dbl.users_empty?
+      @dbl.add_user(tguser, 0, name)
+      bot.api.send_message(chat_id: tguser.id, text: "Registered (priviledged) as #{name}")
+      return
+    end
 
     # subsequent users added with student privileges
     dbuser = @dbl.get_user_by_id(tguser.id)
@@ -34,13 +103,28 @@ class Handler
     end
   end
 
+  def send_answer(bot, tguser, rest)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_user(bot, dbuser) == -1)
+  end
+
+  def lookup_answer(bot, tguser, rest)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_user(bot, dbuser) == -1)
+  end
+
+  def send_review(bot, tguser, rest)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_user(bot, dbuser) == -1)
+  end
+
   # returns if we need to exit
   def process_message(bot, message)
-    p message.text
+    p "process_message: #{message.text}" if @verbose
     return false if message.text.nil?
     return false if not message.text.start_with?('/')
 
-    re = '(/\w+)\s*(\w*)'
+    re = '(/\w+)\s*(.*)'
     matches = message.text.match(re).to_a
     command = matches[1]
     rest = matches[2]
@@ -48,14 +132,53 @@ class Handler
     tgchat = message.chat
     p "C: #{command} from <#{tguser.id}> in chat <#{tgchat.id}> with rest <#{rest}>" if @verbose
     case command
-    when '/register'
-      register_user(bot, tguser, rest)
+    # add exam question (priviledged only)
+    # /add n v text
+    when '/add'
+      add_question(bot, tguser, rest)
 
-      # close and reload database: important before ctrl-break
+    # lokup all questions (priviledged only)
+    when '/questions'
+      all_questions(bot, tguser)
+
+    # start exam (priviledged only)
+    when '/startexam'
+      start_exam(bot, tguser, rest)
+
+    # stop exam, start peer review (priviledged only)
+    when '/startreview'
+      start_review(bot, tguser, rest)
+
+    # sets all grades
+    when '/setgrades'
+      set_grades(bot, tguser, rest)
+
+    # close and reload database: important before ctrl-break
     when '/reload'
       @dbl.close
       @dbl = DBLayer.new(@dbname, @verbose)
-      # TODO: can not make it work: all it reads afterwards is /exit again and again
+
+    when '/register'
+      register_user(bot, tguser, rest)
+
+    when '/answer'
+      send_answer(bot, tguser, rest)
+
+    when '/lookup'
+      lookup_answer(bot, tguser, rest)
+
+    when '/review'
+      send_review(bot, tguser, rest)
+
+    when '/help'
+      helptext <<-HELP
+        /register [name] -- register yourself as user (if name is skipped your telegram login will be taken)
+        /answer n text -- send answer to nth question in your exam ticket
+        /lookup [n] -- lookup your answer to nth question in the database. Without n returns all answers.
+        /review user n grade text -- send review to nth question from user, set grade, send explanation
+      HELP
+      bot.api.send_message(chat_id: tguser.id, text: helptext)
+
     when '/exit'
       return true
     end
