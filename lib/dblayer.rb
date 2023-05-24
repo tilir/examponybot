@@ -54,6 +54,22 @@ class DBLayer
     exit(1)
   end
 
+  def all_users
+    users = []
+    rs = @db.execute('SELECT * FROM users')
+    rs.each do |row|
+      pp row if @verbose
+      next if row[1].nil? or row[2].nil? or row[3].nil?
+
+      users.append Question.new(row[1], row[2], row[3])
+    end
+    users
+  rescue SQLite3::Exception => e
+    puts e
+    close
+    exit(1)
+  end
+
   def add_question(number, variant, question)
     @db.execute('INSERT OR REPLACE INTO questions (number, variant, question) VALUES (?, ?, ?)', [number, variant, question])
     p "question #{number} #{variant} #{question} added" if @verbose
@@ -73,6 +89,10 @@ class DBLayer
       questions.append Question.new(row[1], row[2], row[3])
     end
     questions
+  rescue SQLite3::Exception => e
+    puts e
+    close
+    exit(1)
   end
 
   def get_question(number, variant)
@@ -81,6 +101,24 @@ class DBLayer
 
     p "got question info: #{rs[1]} #{rs[2]} #{rs[3]}" if @verbose
     return Question.new(rs[1], rs[2], rs[3])
+  rescue SQLite3::Exception => e
+    puts e
+    close
+    exit(1)
+  end
+
+  def n_questions
+    rs = @db.get_first_row('SELECT MAX(number) FROM questions')
+    rs[0]
+  rescue SQLite3::Exception => e
+    puts e
+    close
+    exit(1)
+  end
+
+  def n_variants
+    rs = @db.get_first_row('SELECT MAX(variant) FROM questions')
+    rs[0]
   rescue SQLite3::Exception => e
     puts e
     close

@@ -33,6 +33,37 @@ def create_db_structure(db)
       name TEXT
     );
   SQL
+  db.execute <<-SQL
+    CREATE TABLE IF NOT EXISTS userquestions (
+      id INTEGER PRIMARY KEY,
+      exam INTEGER,
+      user INTEGER,
+      question INTEGER
+    );
+  SQL
+  db.execute <<-SQL
+    CREATE TABLE IF NOT EXISTS answers (
+      id INTEGER PRIMARY KEY,
+      uqid INTEGER,
+      answer TEXT      
+    );
+  SQL
+  db.execute <<-SQL
+    CREATE TABLE IF NOT EXISTS userreviews (
+      id INTEGER PRIMARY KEY,
+      exam INTEGER,
+      user INTEGER,
+      uqid INTEGER
+    );
+  SQL
+  db.execute <<-SQL
+    CREATE TABLE IF NOT EXISTS reviews (
+      id INTEGER PRIMARY KEY,
+      revid INTEGER,
+      grade INTEGER,
+      review TEXT      
+    );
+  SQL
 end
 
 class User
@@ -53,6 +84,26 @@ class Question
   def initialize(number, variant, text)
     @number = number
     @variant = variant
+    @text = text
+  end
+end
+
+class Answer
+  attr_accessor :uqid
+  attr_accessor :text
+  def initialize(uqid, text)
+    @uqid = uqid
+    @text = text
+  end
+end
+
+class Review
+  attr_accessor :revid
+  attr_accessor :grade
+  attr_accessor :text
+  def initialize(revid, grade, text)
+    @revid = revid
+    @grade = grade
     @text = text
   end
 end

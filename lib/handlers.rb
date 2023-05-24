@@ -38,6 +38,18 @@ class Handler
 
   # Priviledged part
 
+  def all_users(bot, tguser)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_priv_user(bot, dbuser) == -1)
+
+    allu = @dbl.all_users
+    bot.api.send_message(chat_id: tguser.id, text: "--- all users ---")
+    allu.each do |usr|
+      bot.api.send_message(chat_id: tguser.id, text: "#{usr.userid} #{usr.username} #{usr.privlevel}")
+    end
+    bot.api.send_message(chat_id: tguser.id, text: "---")
+  end
+
   def add_question(bot, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_priv_user(bot, dbuser) == -1)
@@ -57,27 +69,46 @@ class Handler
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_priv_user(bot, dbuser) == -1)
 
-    bot.api.send_message(chat_id: tguser.id, text: "--- all questions ---")
     allq = @dbl.all_questions
+    bot.api.send_message(chat_id: tguser.id, text: "--- all questions ---")
     allq.each do |qst|
       bot.api.send_message(chat_id: tguser.id, text: "#{qst.number} #{qst.variant} #{qst.text}")
     end
     bot.api.send_message(chat_id: tguser.id, text: "---")
+
+    nn = @dbl.n_questions
+    nv = @dbl.n_variants
+    if (nn * nv != allq.length)
+      bot.api.send_message(chat_id: tguser.id, text: "Warning: #{nn} * #{nv} != #{allq.length}")
+    end
   end
 
   def start_exam(bot, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_priv_user(bot, dbuser) == -1)
+
+    allu = @dbl.all_users
+    nn = @dbl.n_questions
+    nv = @dbl.n_variants
+    # set exam to started state (state 1)
+    # determine which user have which variant and send
+    # also write this data to userquestions table
   end
 
   def start_review(bot, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_priv_user(bot, dbuser) == -1)
+    # set exam to review state (state 2)
+    # determine which user have which review and send
+    # also write this data to userreviews table
   end
 
   def set_grades(bot, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_priv_user(bot, dbuser) == -1)
+   # set exam to final state (state 3)
+   # lookup all review records for all registered users
+   # send back grades
  end
 
   # Non-priviledged part
@@ -106,19 +137,25 @@ class Handler
   def send_answer(bot, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_user(bot, dbuser) == -1)
+    # lookup userquestions id
+    # record answer
   end
 
   def lookup_answer(bot, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_user(bot, dbuser) == -1)
+    # lookup userquestions id
+    # send answer back to user
   end
 
   def send_review(bot, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_user(bot, dbuser) == -1)
+    # lookup userreviews id
+    # record review and grade
   end
 
-  # returns if we need to exit
+  # returns true if we need to exit
   def process_message(bot, message)
     p "process_message: #{message.text}" if @verbose
     return false if message.text.nil?
@@ -140,6 +177,10 @@ class Handler
     # lokup all questions (priviledged only)
     when '/questions'
       all_questions(bot, tguser)
+
+    # lokup all questions (priviledged only)
+    when '/users'
+      all_users(bot, tguser)
 
     # start exam (priviledged only)
     when '/startexam'
