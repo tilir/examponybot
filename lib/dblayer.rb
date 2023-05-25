@@ -71,8 +71,15 @@ class DBLayer
   end
 
   def add_question(number, variant, question)
-    @db.execute('INSERT OR REPLACE INTO questions (number, variant, question) VALUES (?, ?, ?)', [number, variant, question])
-    p "question #{number} #{variant} #{question} added" if @verbose
+    rs = @db.get_first_row('SELECT * FROM questions WHERE number = ? AND variant = ?', [number, variant])
+    id = rs[0]
+    if (!rs.empty)
+      @db.execute('UPDATE INTO questions (id, number, variant, question) VALUES (?, ?, ?, ?)', [id, number, variant, question])
+      p "question #{id} #{number} #{variant} #{question} updated" if @verbose
+    else
+      @db.execute('INSERT INTO questions (number, variant, question) VALUES (?, ?, ?)', [number, variant, question])
+      p "question #{number} #{variant} #{question} added" if @verbose
+    end
   rescue SQLite3::Exception => e
     puts e
     close
@@ -119,6 +126,43 @@ class DBLayer
   def n_variants
     rs = @db.get_first_row('SELECT MAX(variant) FROM questions')
     rs[0]
+  rescue SQLite3::Exception => e
+    puts e
+    close
+    exit(1)
+  end
+
+  def exams_empty?
+    rs = @db.execute('SELECT * FROM exams')
+    rs.empty?
+  end
+
+  def add_exam(name)
+    if exams_empty?
+      @db.execute('INSERT INTO exams (state, name) VALUES (?, ?)', [0, name])
+      p "exam added" if @verbose
+    else
+      p "sorry only one exam supported" if @verbose
+    end
+  rescue SQLite3::Exception => e
+    puts e
+    close
+    exit(1)
+  end
+
+  # this can support multiple exams in the future
+  def read_exam_state
+    rs = @db.get_first_row('SELECT * FROM exams')
+    rs[1]
+  rescue SQLite3::Exception => e
+    puts e
+    close
+    exit(1)
+  end
+
+  def set_exam_state(state)
+    rs = @db.get_first_row('SELECT * FROM exams')
+    @db.execute('UPDATE INTO exams (id, state, name) VALUES (?, ?, ?)', [rs[0], state, rs[2]])
   rescue SQLite3::Exception => e
     puts e
     close

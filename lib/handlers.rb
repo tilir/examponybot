@@ -18,19 +18,19 @@ class Handler
     @verbose = verbose
   end
 
-  def check_user(bot, dbuser)
+  def check_user(api, dbuser)
     if (dbuser.nil?)
-      bot.api.send_message(chat_id: tguser.id, text: "Please register to exam")
+      api.send_message(chat_id: tguser.id, text: "Please register to exam")
       return -1
     end
     return 0
   end
 
-  def check_priv_user(bot, dbuser)
-    return -1 if (check_user(bot, dbuser) == -1)
+  def check_priv_user(api, dbuser)
+    return -1 if (check_user(api, dbuser) == -1)
 
     if (dbuser.privlevel != 0)
-      bot.api.send_message(chat_id: tguser.id, text: "Not enough priviledges for the command")
+      api.send_message(chat_id: tguser.id, text: "Not enough priviledges for the command")
       return -1
     end
     return 0
@@ -38,21 +38,21 @@ class Handler
 
   # Priviledged part
 
-  def all_users(bot, tguser)
+  def all_users(api, tguser)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(bot, dbuser) == -1)
+    return if (check_priv_user(api, dbuser) == -1)
 
     allu = @dbl.all_users
-    bot.api.send_message(chat_id: tguser.id, text: "--- all users ---")
+    api.send_message(chat_id: tguser.id, text: "--- all users ---")
     allu.each do |usr|
-      bot.api.send_message(chat_id: tguser.id, text: "#{usr.userid} #{usr.username} #{usr.privlevel}")
+      api.send_message(chat_id: tguser.id, text: "#{usr.userid} #{usr.username} #{usr.privlevel}")
     end
-    bot.api.send_message(chat_id: tguser.id, text: "---")
+    api.send_message(chat_id: tguser.id, text: "---")
   end
 
-  def add_question(bot, tguser, rest)
+  def add_question(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(bot, dbuser) == -1)
+    return if (check_priv_user(api, dbuser) == -1)
 
     p "add_question: #{rest}" if @verbose
     re = '(\d+)\s+(\d+)\s+(.+)'
@@ -63,64 +63,106 @@ class Handler
 
     p "add_question: #{n} #{v} #{t}" if @verbose
     @dbl.add_question(n, v, t)
+    api.send_message(chat_id: tguser.id, text: "question added or updated")
   end
 
-  def all_questions(bot, tguser)
+  def all_questions(api, tguser)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(bot, dbuser) == -1)
+    return if (check_priv_user(api, dbuser) == -1)
 
     allq = @dbl.all_questions
-    bot.api.send_message(chat_id: tguser.id, text: "--- all questions ---")
+    api.send_message(chat_id: tguser.id, text: "--- all questions ---")
     allq.each do |qst|
-      bot.api.send_message(chat_id: tguser.id, text: "#{qst.number} #{qst.variant} #{qst.text}")
+      api.send_message(chat_id: tguser.id, text: "#{qst.number} #{qst.variant} #{qst.text}")
     end
-    bot.api.send_message(chat_id: tguser.id, text: "---")
+    api.send_message(chat_id: tguser.id, text: "---")
 
     nn = @dbl.n_questions
     nv = @dbl.n_variants
     if (nn * nv != allq.length)
-      bot.api.send_message(chat_id: tguser.id, text: "Warning: #{nn} * #{nv} != #{allq.length}")
+      api.send_message(chat_id: tguser.id, text: "Warning: #{nn} * #{nv} != #{allq.length}")
     end
   end
 
-  def start_exam(bot, tguser, rest)
+  def add_exam(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(bot, dbuser) == -1)
+    return if (check_priv_user(api, dbuser) == -1)
+
+    if @dbl.exams_empty?
+      @dbl.add_exam("exam")
+      api.send_message(chat_id: tguser.id, text: "Exam added")
+    else
+      api.send_message(chat_id: tguser.id, text: "Exam already exists, currently only one exam possible")
+    end
+  end
+
+  def start_exam(api, tguser, rest)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_priv_user(api, dbuser) == -1)
+
+    st = @dbl.read_exam_state
+    if (st != EXAM_STATE[:stopped])
+      api.send_message(chat_id: tguser.id, text: "Exam currently not in stopped mode")
+      return
+    end
+    @dbl.set_exam_state(EXAM_STATE[:answering])
 
     allu = @dbl.all_users
     nn = @dbl.n_questions
     nv = @dbl.n_variants
-    # set exam to started state (state 1)
-    # determine which user have which variant and send
-    # also write this data to userquestions table
+
+    allu.each do |dbuser|
+      # determine which user have which variant
+      # write this data to userquestions table
+      # send to user
+    end
   end
 
-  def start_review(bot, tguser, rest)
+  def start_review(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(bot, dbuser) == -1)
-    # set exam to review state (state 2)
+    return if (check_priv_user(api, dbuser) == -1)
+
+    st = @dbl.read_exam_state
+    if (st != EXAM_STATE[:answering])
+      api.send_message(chat_id: tguser.id, text: "Exam currently not in answering mode")
+      return
+    end
+    @dbl.set_exam_state(EXAM_STATE[:reviewing])
+
     # determine which user have which review and send
     # also write this data to userreviews table
   end
 
-  def set_grades(bot, tguser, rest)
+  def set_grades(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(bot, dbuser) == -1)
-   # set exam to final state (state 3)
+    return if (check_priv_user(api, dbuser) == -1)
+
+    st = @dbl.read_exam_state
+    if (st != EXAM_STATE[:reviewing])
+      api.send_message(chat_id: tguser.id, text: "Exam currently not in reviewing mode")
+      return
+    end
+    @dbl.set_exam_state(EXAM_STATE[:grading])
+
    # lookup all review records for all registered users
    # send back grades
  end
 
   # Non-priviledged part
 
-  def register_user(bot, tguser, name)
+  def register_user(api, tguser, name)
     name = "#{tguser.username}" if name.nil? or name == ""
     p "register_user: #{name}" if @verbose
 
     # first user added with pedagogical priviledges
     if @dbl.users_empty?
       @dbl.add_user(tguser, 0, name)
-      bot.api.send_message(chat_id: tguser.id, text: "Registered (priviledged) as #{name}")
+      api.send_message(chat_id: tguser.id, text: "Registered (priviledged) as #{name}")
+      return
+    end
+
+    if (exams_empty? or @dbl.read_exam_state != EXAM_STATE[:stopped])
+      api.send_message(chat_id: tguser.id, text: "Exam currently not in stopped mode")
       return
     end
 
@@ -128,35 +170,57 @@ class Handler
     dbuser = @dbl.get_user_by_id(tguser.id)
     if (dbuser.nil?)
       @dbl.add_user(tguser, 1, name)
-      bot.api.send_message(chat_id: tguser.id, text: "Registered as #{name}")
+      api.send_message(chat_id: tguser.id, text: "Registered as #{name}")
     else
-      bot.api.send_message(chat_id: tguser.id, text: "You were already registered as #{dbuser.username}")
+      api.send_message(chat_id: tguser.id, text: "You were already registered as #{dbuser.username}")
     end
   end
 
-  def send_answer(bot, tguser, rest)
+  def send_answer(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_user(bot, dbuser) == -1)
+    return if (check_user(api, dbuser) == -1)
+
+    st = @dbl.read_exam_state
+    if (st != EXAM_STATE[:answering])
+      api.send_message(chat_id: tguser.id, text: "Exam not accepting answers now")
+      return
+    end
+
     # lookup userquestions id
     # record answer
   end
 
-  def lookup_answer(bot, tguser, rest)
+  def lookup_answer(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_user(bot, dbuser) == -1)
+    return if (check_user(api, dbuser) == -1)
+
     # lookup userquestions id
     # send answer back to user
   end
 
-  def send_review(bot, tguser, rest)
+  def send_review(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_user(bot, dbuser) == -1)
+    return if (check_user(api, dbuser) == -1)
+
+    if (st != EXAM_STATE[:reviewing])
+      api.send_message(chat_id: tguser.id, text: "Exam not accepting answers now")
+      return
+    end
+
     # lookup userreviews id
     # record review and grade
   end
 
+  def lookup_review(api, tguser, rest)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_user(api, dbuser) == -1)
+
+    # lookup userquestions id
+    # send answer back to user
+  end
+
   # returns true if we need to exit
-  def process_message(bot, message)
+  def process_message(api, message)
     p "process_message: #{message.text}" if @verbose
     return false if message.text.nil?
     return false if not message.text.start_with?('/')
@@ -171,28 +235,39 @@ class Handler
     case command
     # add exam question (priviledged only)
     # /add n v text
-    when '/add'
-      add_question(bot, tguser, rest)
+    when '/addquestion'
+      add_question(api, tguser, rest)
 
     # lokup all questions (priviledged only)
     when '/questions'
-      all_questions(bot, tguser)
+      all_questions(api, tguser)
 
     # lokup all questions (priviledged only)
     when '/users'
-      all_users(bot, tguser)
+      all_users(api, tguser)
+
+    when '/addexam'
+      add_exam(api, tguser, rest)
 
     # start exam (priviledged only)
+    # after start, users can submit answers
     when '/startexam'
-      start_exam(bot, tguser, rest)
+      start_exam(api, tguser, rest)
 
-    # stop exam, start peer review (priviledged only)
+    # start peer review (priviledged only)
+    # users can no longer submit answers and shall submit reviews
     when '/startreview'
-      start_review(bot, tguser, rest)
+      start_review(api, tguser, rest)
 
     # sets all grades
+    # users can no longer submit reviews but can query review results and grades
     when '/setgrades'
-      set_grades(bot, tguser, rest)
+      set_grades(api, tguser, rest)
+
+    # finish exam (priviledged only)
+    # exam non-existent, everything cleaned up
+    when '/stopexam'
+      stop_exam(api, tguser, rest)
 
     # close and reload database: important before ctrl-break
     when '/reload'
@@ -200,16 +275,19 @@ class Handler
       @dbl = DBLayer.new(@dbname, @verbose)
 
     when '/register'
-      register_user(bot, tguser, rest)
+      register_user(api, tguser, rest)
 
     when '/answer'
-      send_answer(bot, tguser, rest)
+      send_answer(api, tguser, rest)
 
-    when '/lookup'
-      lookup_answer(bot, tguser, rest)
+    when '/lookup_answer'
+      lookup_answer(api, tguser, rest)
 
     when '/review'
-      send_review(bot, tguser, rest)
+      send_review(api, tguser, rest)
+
+    when '/lookup_review'
+      lookup_answer(api, tguser, rest)
 
     when '/help'
       helptext <<-HELP
@@ -218,7 +296,7 @@ class Handler
         /lookup [n] -- lookup your answer to nth question in the database. Without n returns all answers.
         /review user n grade text -- send review to nth question from user, set grade, send explanation
       HELP
-      bot.api.send_message(chat_id: tguser.id, text: helptext)
+      api.send_message(chat_id: tguser.id, text: helptext)
 
     when '/exit'
       return true

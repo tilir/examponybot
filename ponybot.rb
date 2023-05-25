@@ -54,7 +54,7 @@ def main
   first = true
   Telegram::Bot::Client.run(options[:token]) do |bot|
     bot.listen do |event|
-      finish = handler.process_message(bot, event) if event.class == Telegram::Bot::Types::Message
+      finish = handler.process_message(bot.api, event) if event.class == Telegram::Bot::Types::Message
       break if finish and not first
 
       first = false

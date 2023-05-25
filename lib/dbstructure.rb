@@ -9,6 +9,13 @@
 #
 #------------------------------------------------------------------------------
 
+EXAM_STATE = {
+  stopped: 0,
+  answering: 1,
+  reviewing: 2,
+  grading: 3
+}
+
 def create_db_structure(db)
   db.execute <<-SQL
     CREATE TABLE IF NOT EXISTS users (
@@ -52,6 +59,7 @@ def create_db_structure(db)
     CREATE TABLE IF NOT EXISTS userreviews (
       id INTEGER PRIMARY KEY,
       exam INTEGER,
+      revno INTEGER,
       user INTEGER,
       uqid INTEGER
     );
