@@ -107,8 +107,7 @@ class Handler
     end
     @dbl.set_exam_state(EXAM_STATE[:answering])
 
-    # TODO: remove priv users
-    allu = @dbl.all_users
+    allu = @dbl.all_nonpriv_users
     nn = @dbl.n_questions
     nv = @dbl.n_variants
     prng = Random.new
@@ -117,7 +116,7 @@ class Handler
       (1..nn).each do |n|
         v = prng.rand(1..nv)
         q = @dbl.get_question(n, v)
-        # write this data to userquestions table        
+        @dbl.register_question(dbuser.id, q.id)
         api.send_message(chat_id: dbuser.userid, text: "Question #{n}, variant #{v}: #{q.text}")
       end
     end
@@ -126,6 +125,7 @@ class Handler
   def stop_exam(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_priv_user(api, dbuser, tguser) == -1)
+
     @dbl.set_exam_state(EXAM_STATE[:stopped])
   end
 
@@ -199,16 +199,50 @@ class Handler
       return
     end
 
-    # lookup userquestions id
-    # record answer
+    re = /(\d+)\s+(.+)/m
+    m = rest.match(re).to_a
+    n = m[1].to_i
+    t = m[2]
+    nn = @dbl.n_questions
+
+    p "Answer from #{tguser.username} to #{n} is: #{t}" if @verbose
+
+    if (n > nn) or (n < 1)
+      api.send_message(chat_id: tguser.id, text: "Answer have incorrect number. Please see /help.")
+      return
+    end
+    uqid = @dbl.user_nth_question(dbuser.id, n)
+    @dbl.record_answer(uqid, t)
+    api.send_message(chat_id: tguser.id, text: "Answer recorded to #{uqid}")
   end
 
   def lookup_answer(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_user(api, dbuser) == -1)
 
-    # lookup userquestions id
-    # send answer back to user
+    re = /(\d+)/m
+    m = rest.match(re).to_a
+    n = m[1].to_i
+    if (n > nn) or (n < 1)
+      api.send_message(chat_id: tguser.id, text: "Answer have incorrect number #{rest}. Please see /help.")
+      return
+    end
+
+    uqid = @dbl.user_nth_question(dbuser.id, n)
+
+    if uqid.nil?
+      api.send_message(chat_id: tguser.id, text: "You don't have this question yet.")
+      return
+    end
+
+    answ = @dbl.uqid_to_answer(uqid)
+
+    if (answ.nil?)
+      api.send_message(chat_id: tguser.id, text: "You haven't answered yet.")
+      return
+    end
+
+    api.send_message(chat_id: tguser.id, text: answ.text)
   end
 
   def send_review(api, tguser, rest)
@@ -234,10 +268,10 @@ class Handler
 
   def print_help
     <<-HELP
-    /register -- register yourself as user
-    /answer n text -- send answer to nth question in your exam ticket
+    /register -- register yourself as a user.
+    /answer n text -- send answer to nth question in your exam ticket. Text can be multi-line.
     /lookup [n] -- lookup your answer to nth question in the database. Without n returns all answers.
-    /review user n grade text -- send review to nth question from user, set grade, send explanation
+    /review user n grade text -- send review to nth question from user, set grade, send explanation.
     HELP
   end
 
@@ -293,8 +327,13 @@ class Handler
 
     # close and reload database: important before ctrl-break
     when '/reload'
-      @dbl.close
-      @dbl = DBLayer.new(@dbname, @verbose)
+      dbuser = @dbl.get_user_by_id(tguser.id)
+      if (check_priv_user(api, dbuser, tguser) != -1)
+        @dbl.close
+        @dbl = DBLayer.new(@dbname, @verbose)
+      end
+
+    # --- non-priviledged part
 
     when '/register'
       register_user(api, tguser, rest)
@@ -316,7 +355,7 @@ class Handler
       api.send_message(chat_id: tguser.id, text: "#{helptext}")
     when '/exit'
       dbuser = @dbl.get_user_by_id(tguser.id)
-      return true if (check_priv_user(api, dbuser, tguser) != -1)      
+      return true if (check_priv_user(api, dbuser, tguser) != -1)
     else
       helptext = print_help
       api.send_message(chat_id: tguser.id, text: "Unknown command")

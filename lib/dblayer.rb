@@ -46,7 +46,7 @@ class DBLayer
     return nil if rs.nil? or rs.empty?
 
     p "got user info: #{rs[1]} #{rs[2]} #{rs[3]}" if @verbose
-    return User.new(rs[1], rs[2], rs[3])
+    return User.new(rs[0], rs[1], rs[2], rs[3])
   rescue SQLite3::Exception => e
     puts e
     close
@@ -63,16 +63,30 @@ class DBLayer
     exit(1)
   end
 
-  def all_users
+  def collect_users(rs)
     users = []
-    rs = @db.execute('SELECT * FROM users')
+    return users if rs.nil?
     rs.each do |row|
       pp row if @verbose
       next if row[1].nil? or row[2].nil? or row[3].nil?
 
-      users.append User.new(row[1], row[2], row[3])
+      users.append User.new(row[0], row[1], row[2], row[3])
     end
     users
+  end
+
+  def all_users
+    rs = @db.execute('SELECT * FROM users')
+    collect_users(rs)
+  rescue SQLite3::Exception => e
+    puts e
+    close
+    exit(1)
+  end
+
+  def all_nonpriv_users
+    rs = @db.execute('SELECT * FROM users WHERE privlevel = 1')
+    collect_users(rs)
   rescue SQLite3::Exception => e
     puts e
     close
@@ -80,7 +94,7 @@ class DBLayer
   end
 
   def add_question(number, variant, question)
-    rs = @db.get_first_row('SELECT * FROM questions WHERE number = ? AND variant = ?', [number, variant])    
+    rs = @db.get_first_row('SELECT * FROM questions WHERE number = ? AND variant = ?', [number, variant])
     if (rs.nil?)
       @db.execute('INSERT INTO questions (number, variant, question) VALUES (?, ?, ?)', [number, variant, question])
       p "question #{number} #{variant} #{question} added" if @verbose
@@ -101,7 +115,7 @@ class DBLayer
       pp row if @verbose
       next if row[1].nil? or row[2].nil? or row[3].nil?
 
-      questions.append Question.new(row[1], row[2], row[3])
+      questions.append Question.new(row[0], row[1], row[2], row[3])
     end
     questions
   rescue SQLite3::Exception => e
@@ -115,7 +129,7 @@ class DBLayer
     return nil if rs.empty?
 
     p "got question info: #{rs[1]} #{rs[2]} #{rs[3]}" if @verbose
-    return Question.new(rs[1], rs[2], rs[3])
+    return Question.new(rs[0], rs[1], rs[2], rs[3])
   rescue SQLite3::Exception => e
     puts e
     close
@@ -175,6 +189,46 @@ class DBLayer
     puts e
     close
     exit(1)
+  end
+
+  def register_question(uid, qid)
+    rs = @db.get_first_row('SELECT * FROM userquestions WHERE user = ? AND question = ?', [uid, qid])
+    if (rs.nil?)
+      @db.execute('INSERT INTO userquestions (exam, user, question) VALUES (?, ?, ?)', [0, uid, qid])
+      p "question #{qid} linked with user #{uid}" if @verbose
+    else
+      p "question #{qid} link with user #{uid} already exists" if @verbose
+    end
+  rescue SQLite3::Exception => e
+    puts e
+    close
+    exit(1)
+  end
+
+  def user_nth_question(uid, n)
+    rs = @db.get_first_row <<-SQL
+      SELECT userquestions.id FROM userquestions
+      LEFT JOIN questions ON userquestions.question = questions.id
+      WHERE userquestions.user = ? AND questions.number = ?
+    SQL, [uid, n]
+    return nil if rs.nil?
+    rs[0]
+  end
+
+  def record_answer(uqid, t)
+    rs = @db.get_first_row('SELECT * FROM answers WHERE uqid = ?', [uqid])
+    if (rs.nil?)
+      @db.execute('INSERT INTO answers (uqid, answer) VALUES (?, ?)', [0, uqid, t])
+      p "answer #{t} recorded for #{uid}" if @verbose
+    else
+      @db.execute('UPDATE exams SET answer = ? WHERE id = ?', [t, rs[0]])
+    end
+  end
+
+  def uqid_to_answer(uqid)
+    rs = @db.get_first_row('SELECT * FROM answers WHERE uqid = ?', [uqid])
+    return nil if rs.nil?
+    return Answer.new(rs[0], rs[1], rs[2])
   end
 
   def close

@@ -75,10 +75,12 @@ def create_db_structure(db)
 end
 
 class User
+  attr_accessor :id
   attr_accessor :userid
   attr_accessor :username
   attr_accessor :privlevel
-  def initialize(userid, username, privlevel)
+  def initialize(id, username, privlevel)
+    @id = id
     @userid = userid
     @username = username
     @privlevel = privlevel
@@ -86,10 +88,12 @@ class User
 end
 
 class Question
+  attr_accessor :id
   attr_accessor :number
   attr_accessor :variant
   attr_accessor :text
-  def initialize(number, variant, text)
+  def initialize(id, number, variant, text)
+    @id = id
     @number = number
     @variant = variant
     @text = text
@@ -97,19 +101,23 @@ class Question
 end
 
 class Answer
+  attr_accessor :id
   attr_accessor :uqid
   attr_accessor :text
-  def initialize(uqid, text)
+  def initialize(id, uqid, text)
+    @id = id
     @uqid = uqid
     @text = text
   end
 end
 
 class Review
+  attr_accessor :id
   attr_accessor :revid
   attr_accessor :grade
   attr_accessor :text
-  def initialize(revid, grade, text)
+  def initialize(id, revid, grade, text)
+    @id = id
     @revid = revid
     @grade = grade
     @text = text
