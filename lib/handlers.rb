@@ -173,7 +173,7 @@ class Handler
       return
     end
 
-    if (@dbl.exams_empty? or @dbl.read_exam_state != EXAM_STATE[:stopped])
+    if (not @dbl.exams_empty? and @dbl.read_exam_state != EXAM_STATE[:stopped])
       api.send_message(chat_id: tguser.id, text: "Exam currently not in stopped mode")
       return
     end
@@ -191,7 +191,7 @@ class Handler
 
   def send_answer(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_user(api, dbuser) == -1)
+    return if (check_user(api, dbuser, tguser) == -1)
 
     st = @dbl.read_exam_state
     if (st != EXAM_STATE[:answering])
@@ -218,7 +218,7 @@ class Handler
 
   def lookup_answer(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_user(api, dbuser) == -1)
+    return if (check_user(api, dbuser, tguser) == -1)
 
     re = /(\d+)/m
     m = rest.match(re).to_a
@@ -247,7 +247,7 @@ class Handler
 
   def send_review(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_user(api, dbuser) == -1)
+    return if (check_user(api, dbuser, tguser) == -1)
 
     if (st != EXAM_STATE[:reviewing])
       api.send_message(chat_id: tguser.id, text: "Exam not accepting answers now")
@@ -260,7 +260,7 @@ class Handler
 
   def lookup_review(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_user(api, dbuser) == -1)
+    return if (check_user(api, dbuser, tguser) == -1)
 
     # lookup userquestions id
     # send answer back to user

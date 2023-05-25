@@ -66,6 +66,7 @@ class DBLayer
   def collect_users(rs)
     users = []
     return users if rs.nil?
+
     rs.each do |row|
       pp row if @verbose
       next if row[1].nil? or row[2].nil? or row[3].nil?
@@ -98,7 +99,7 @@ class DBLayer
     if (rs.nil?)
       @db.execute('INSERT INTO questions (number, variant, question) VALUES (?, ?, ?)', [number, variant, question])
       p "question #{number} #{variant} #{question} added" if @verbose
-    else      
+    else
       @db.execute('UPDATE questions SET question = ? WHERE number = ? AND variant = ?', [number, variant, question])
       p "question #{number} #{variant} #{question} updated" if @verbose
     end
@@ -183,7 +184,7 @@ class DBLayer
   end
 
   def set_exam_state(state)
-    rs = @db.get_first_row('SELECT * FROM exams')    
+    rs = @db.get_first_row('SELECT * FROM exams')
     @db.execute('UPDATE exams SET state = ? WHERE id = ?', [state, rs[0]])
   rescue SQLite3::Exception => e
     puts e
@@ -206,28 +207,31 @@ class DBLayer
   end
 
   def user_nth_question(uid, n)
-    rs = @db.get_first_row <<-SQL
+    multiline = <<-SQL
       SELECT userquestions.id FROM userquestions
       LEFT JOIN questions ON userquestions.question = questions.id
       WHERE userquestions.user = ? AND questions.number = ?
-    SQL, [uid, n]
+    SQL
+    rs = @db.get_first_row("#{multiline}", [uid, n])
     return nil if rs.nil?
+
     rs[0]
   end
 
   def record_answer(uqid, t)
     rs = @db.get_first_row('SELECT * FROM answers WHERE uqid = ?', [uqid])
     if (rs.nil?)
-      @db.execute('INSERT INTO answers (uqid, answer) VALUES (?, ?)', [0, uqid, t])
-      p "answer #{t} recorded for #{uid}" if @verbose
+      @db.execute('INSERT INTO answers (uqid, answer) VALUES (?, ?)', [uqid, t])
+      p "answer #{t} recorded for #{uqid}" if @verbose
     else
-      @db.execute('UPDATE exams SET answer = ? WHERE id = ?', [t, rs[0]])
+      @db.execute('UPDATE answers SET answer = ? WHERE id = ?', [t, rs[0]])
     end
   end
 
   def uqid_to_answer(uqid)
     rs = @db.get_first_row('SELECT * FROM answers WHERE uqid = ?', [uqid])
     return nil if rs.nil?
+
     return Answer.new(rs[0], rs[1], rs[2])
   end
 

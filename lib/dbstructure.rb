@@ -79,7 +79,7 @@ class User
   attr_accessor :userid
   attr_accessor :username
   attr_accessor :privlevel
-  def initialize(id, username, privlevel)
+  def initialize(id, userid, username, privlevel)
     @id = id
     @userid = userid
     @username = username
