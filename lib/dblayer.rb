@@ -32,9 +32,18 @@ class DBLayer
     exit(1)
   end
 
+  def update_user(tguser, priv, name)
+    @db.execute('UPDATE users SET username = ? WHERE userid = ?', [name, tguser.id])
+    p "user #{name} updated with priv level #{priv}" if @verbose
+  rescue SQLite3::Exception => e
+    puts e
+    close
+    exit(1)
+  end
+
   def get_user_by_id(id)
     rs = @db.get_first_row('SELECT * FROM users WHERE userid = ?', [id])
-    return nil if rs.empty?
+    return nil if rs.nil? or rs.empty?
 
     p "got user info: #{rs[1]} #{rs[2]} #{rs[3]}" if @verbose
     return User.new(rs[1], rs[2], rs[3])
@@ -61,7 +70,7 @@ class DBLayer
       pp row if @verbose
       next if row[1].nil? or row[2].nil? or row[3].nil?
 
-      users.append Question.new(row[1], row[2], row[3])
+      users.append User.new(row[1], row[2], row[3])
     end
     users
   rescue SQLite3::Exception => e
@@ -71,14 +80,13 @@ class DBLayer
   end
 
   def add_question(number, variant, question)
-    rs = @db.get_first_row('SELECT * FROM questions WHERE number = ? AND variant = ?', [number, variant])
-    id = rs[0]
-    if (!rs.empty)
-      @db.execute('UPDATE INTO questions (id, number, variant, question) VALUES (?, ?, ?, ?)', [id, number, variant, question])
-      p "question #{id} #{number} #{variant} #{question} updated" if @verbose
-    else
+    rs = @db.get_first_row('SELECT * FROM questions WHERE number = ? AND variant = ?', [number, variant])    
+    if (rs.nil?)
       @db.execute('INSERT INTO questions (number, variant, question) VALUES (?, ?, ?)', [number, variant, question])
       p "question #{number} #{variant} #{question} added" if @verbose
+    else      
+      @db.execute('UPDATE questions SET question = ? WHERE number = ? AND variant = ?', [number, variant, question])
+      p "question #{number} #{variant} #{question} updated" if @verbose
     end
   rescue SQLite3::Exception => e
     puts e
@@ -161,8 +169,8 @@ class DBLayer
   end
 
   def set_exam_state(state)
-    rs = @db.get_first_row('SELECT * FROM exams')
-    @db.execute('UPDATE INTO exams (id, state, name) VALUES (?, ?, ?)', [rs[0], state, rs[2]])
+    rs = @db.get_first_row('SELECT * FROM exams')    
+    @db.execute('UPDATE exams SET state = ? WHERE id = ?', [state, rs[0]])
   rescue SQLite3::Exception => e
     puts e
     close

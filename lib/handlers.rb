@@ -18,7 +18,7 @@ class Handler
     @verbose = verbose
   end
 
-  def check_user(api, dbuser)
+  def check_user(api, dbuser, tguser)
     if (dbuser.nil?)
       api.send_message(chat_id: tguser.id, text: "Please register to exam")
       return -1
@@ -26,8 +26,8 @@ class Handler
     return 0
   end
 
-  def check_priv_user(api, dbuser)
-    return -1 if (check_user(api, dbuser) == -1)
+  def check_priv_user(api, dbuser, tguser)
+    return -1 if (check_user(api, dbuser, tguser) == -1)
 
     if (dbuser.privlevel != 0)
       api.send_message(chat_id: tguser.id, text: "Not enough priviledges for the command")
@@ -40,7 +40,7 @@ class Handler
 
   def all_users(api, tguser)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(api, dbuser) == -1)
+    return if (check_priv_user(api, dbuser, tguser) == -1)
 
     allu = @dbl.all_users
     api.send_message(chat_id: tguser.id, text: "--- all users ---")
@@ -52,10 +52,10 @@ class Handler
 
   def add_question(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(api, dbuser) == -1)
+    return if (check_priv_user(api, dbuser, tguser) == -1)
 
     p "add_question: #{rest}" if @verbose
-    re = '(\d+)\s+(\d+)\s+(.+)'
+    re = /(\d+)\s+(\d+)\s+(.+)/m
     m = rest.match(re).to_a
     n = m[1]
     v = m[2]
@@ -68,7 +68,7 @@ class Handler
 
   def all_questions(api, tguser)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(api, dbuser) == -1)
+    return if (check_priv_user(api, dbuser, tguser) == -1)
 
     allq = @dbl.all_questions
     api.send_message(chat_id: tguser.id, text: "--- all questions ---")
@@ -86,7 +86,7 @@ class Handler
 
   def add_exam(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(api, dbuser) == -1)
+    return if (check_priv_user(api, dbuser, tguser) == -1)
 
     if @dbl.exams_empty?
       @dbl.add_exam("exam")
@@ -98,7 +98,7 @@ class Handler
 
   def start_exam(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(api, dbuser) == -1)
+    return if (check_priv_user(api, dbuser, tguser) == -1)
 
     st = @dbl.read_exam_state
     if (st != EXAM_STATE[:stopped])
@@ -107,20 +107,31 @@ class Handler
     end
     @dbl.set_exam_state(EXAM_STATE[:answering])
 
+    # TODO: remove priv users
     allu = @dbl.all_users
     nn = @dbl.n_questions
     nv = @dbl.n_variants
+    prng = Random.new
 
     allu.each do |dbuser|
-      # determine which user have which variant
-      # write this data to userquestions table
-      # send to user
+      (1..nn).each do |n|
+        v = prng.rand(1..nv)
+        q = @dbl.get_question(n, v)
+        # write this data to userquestions table        
+        api.send_message(chat_id: dbuser.userid, text: "Question #{n}, variant #{v}: #{q.text}")
+      end
     end
+  end
+
+  def stop_exam(api, tguser, rest)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_priv_user(api, dbuser, tguser) == -1)
+    @dbl.set_exam_state(EXAM_STATE[:stopped])
   end
 
   def start_review(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(api, dbuser) == -1)
+    return if (check_priv_user(api, dbuser, tguser) == -1)
 
     st = @dbl.read_exam_state
     if (st != EXAM_STATE[:answering])
@@ -135,7 +146,7 @@ class Handler
 
   def set_grades(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return if (check_priv_user(api, dbuser) == -1)
+    return if (check_priv_user(api, dbuser, tguser) == -1)
 
     st = @dbl.read_exam_state
     if (st != EXAM_STATE[:reviewing])
@@ -152,6 +163,7 @@ class Handler
 
   def register_user(api, tguser, name)
     name = "#{tguser.username}" if name.nil? or name == ""
+    name = "#{tguser.id}" if name.nil? or name == ""
     p "register_user: #{name}" if @verbose
 
     # first user added with pedagogical priviledges
@@ -161,7 +173,7 @@ class Handler
       return
     end
 
-    if (exams_empty? or @dbl.read_exam_state != EXAM_STATE[:stopped])
+    if (@dbl.exams_empty? or @dbl.read_exam_state != EXAM_STATE[:stopped])
       api.send_message(chat_id: tguser.id, text: "Exam currently not in stopped mode")
       return
     end
@@ -172,7 +184,8 @@ class Handler
       @dbl.add_user(tguser, 1, name)
       api.send_message(chat_id: tguser.id, text: "Registered as #{name}")
     else
-      api.send_message(chat_id: tguser.id, text: "You were already registered as #{dbuser.username}")
+      @dbl.update_user(tguser, 1, name)
+      api.send_message(chat_id: tguser.id, text: "Reg info updated to: #{name}")
     end
   end
 
@@ -219,13 +232,22 @@ class Handler
     # send answer back to user
   end
 
+  def print_help
+    <<-HELP
+    /register -- register yourself as user
+    /answer n text -- send answer to nth question in your exam ticket
+    /lookup [n] -- lookup your answer to nth question in the database. Without n returns all answers.
+    /review user n grade text -- send review to nth question from user, set grade, send explanation
+    HELP
+  end
+
   # returns true if we need to exit
   def process_message(api, message)
     p "process_message: #{message.text}" if @verbose
     return false if message.text.nil?
     return false if not message.text.start_with?('/')
 
-    re = '(/\w+)\s*(.*)'
+    re = /(\/\w+)\s*(.*)/m
     matches = message.text.match(re).to_a
     command = matches[1]
     rest = matches[2]
@@ -290,16 +312,15 @@ class Handler
       lookup_answer(api, tguser, rest)
 
     when '/help'
-      helptext <<-HELP
-        /register [name] -- register yourself as user (if name is skipped your telegram login will be taken)
-        /answer n text -- send answer to nth question in your exam ticket
-        /lookup [n] -- lookup your answer to nth question in the database. Without n returns all answers.
-        /review user n grade text -- send review to nth question from user, set grade, send explanation
-      HELP
-      api.send_message(chat_id: tguser.id, text: helptext)
-
+      helptext = print_help
+      api.send_message(chat_id: tguser.id, text: "#{helptext}")
     when '/exit'
-      return true
+      dbuser = @dbl.get_user_by_id(tguser.id)
+      return true if (check_priv_user(api, dbuser, tguser) != -1)      
+    else
+      helptext = print_help
+      api.send_message(chat_id: tguser.id, text: "Unknown command")
+      api.send_message(chat_id: tguser.id, text: "#{helptext}")
     end
     return false
   end
