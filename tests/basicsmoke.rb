@@ -164,3 +164,21 @@ handler.process_message(api, event)
 
 event = PseudoMessage.new(prepod, chat, "/startreview")
 handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/review 10 2 don't like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/review 11 2 don't like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/review 12 2 don't like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/review 112 2 don't like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/lookup_review 10")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/lookup_review 112")
+handler.process_message(api, event)

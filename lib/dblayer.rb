@@ -18,7 +18,7 @@ class DBLayer
     @verbose = verbose
     create_db_structure(@db)
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -27,7 +27,7 @@ class DBLayer
     @db.execute('INSERT INTO users (userid, username, privlevel) VALUES (?, ?, ?)', [tguser.id, name, priv])
     p "user #{name} added with priv level #{priv}" if @verbose
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -36,7 +36,7 @@ class DBLayer
     @db.execute('UPDATE users SET username = ? WHERE userid = ?', [name, tguser.id])
     p "user #{name} updated with priv level #{priv}" if @verbose
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -48,7 +48,7 @@ class DBLayer
     p "got user info: #{rs[1]} #{rs[2]} #{rs[3]}" if @verbose
     return User.new(rs[0], rs[1], rs[2], rs[3])
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -58,7 +58,7 @@ class DBLayer
     p "user table empty" if @verbose and rs.empty?
     rs.empty?
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -80,7 +80,7 @@ class DBLayer
     rs = @db.execute('SELECT * FROM users')
     collect_users(rs)
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -89,7 +89,7 @@ class DBLayer
     rs = @db.execute('SELECT * FROM users WHERE privlevel = 1')
     collect_users(rs)
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -104,7 +104,7 @@ class DBLayer
       p "question #{number} #{variant} #{question} updated" if @verbose
     end
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -120,7 +120,7 @@ class DBLayer
     end
     questions
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -132,7 +132,7 @@ class DBLayer
     p "got question info: #{rs[1]} #{rs[2]} #{rs[3]}" if @verbose
     return Question.new(rs[0], rs[1], rs[2], rs[3])
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -141,7 +141,7 @@ class DBLayer
     rs = @db.get_first_row('SELECT MAX(number) FROM questions')
     rs[0]
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -150,7 +150,7 @@ class DBLayer
     rs = @db.get_first_row('SELECT MAX(variant) FROM questions')
     rs[0]
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -168,7 +168,7 @@ class DBLayer
       p "sorry only one exam supported" if @verbose
     end
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -178,7 +178,7 @@ class DBLayer
     rs = @db.get_first_row('SELECT * FROM exams')
     rs[1]
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -187,7 +187,7 @@ class DBLayer
     rs = @db.get_first_row('SELECT * FROM exams')
     @db.execute('UPDATE exams SET state = ? WHERE id = ?', [state, rs[0]])
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -201,7 +201,7 @@ class DBLayer
       p "question #{qid} link with user #{uid} already exists" if @verbose
     end
   rescue SQLite3::Exception => e
-    puts e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
   end
@@ -216,6 +216,10 @@ class DBLayer
     return nil if rs.nil?
 
     rs[0]
+  rescue SQLite3::Exception => e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
+    close
+    exit(1)
   end
 
   def collect_answers(rs)
@@ -223,6 +227,7 @@ class DBLayer
     return answers if rs.nil?
 
     rs.each do |row|
+      p row if @verbose
       next if row[1].nil? or row[2].nil?
 
       answers.append Answer.new(row[0], row[1], row[2])
@@ -236,10 +241,12 @@ class DBLayer
       INNER JOIN answers ON userquestions.id = answers.uqid
       WHERE userquestions.user = ?
     SQL
-    rs = @db.execute(multiline)
-    return nil if rs.nil?
-
+    rs = @db.execute(multiline, [uid])
     collect_answers(rs)
+  rescue SQLite3::Exception => e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
+    close
+    exit(1)
   end
 
   def all_answered_users
@@ -252,6 +259,10 @@ class DBLayer
     return nil if rs.nil?
 
     collect_users(rs)
+  rescue SQLite3::Exception => e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
+    close
+    exit(1)
   end
 
   def record_answer(uqid, t)
@@ -261,7 +272,12 @@ class DBLayer
       p "answer #{t} recorded for #{uqid}" if @verbose
     else
       @db.execute('UPDATE answers SET answer = ? WHERE id = ?', [t, rs[0]])
+      p "answer #{t} updated for #{uqid}" if @verbose
     end
+  rescue SQLite3::Exception => e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
+    close
+    exit(1)
   end
 
   def uqid_to_answer(uqid)
@@ -269,6 +285,63 @@ class DBLayer
     return nil if rs.nil?
 
     return Answer.new(rs[0], rs[1], rs[2])
+  rescue SQLite3::Exception => e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
+    close
+    exit(1)
+  end
+
+  def create_review_assignment(rid, uqid)
+    rs = @db.get_first_row('SELECT * FROM userreviews WHERE reviewer = ? AND uqid = ?', [rid, uqid])
+    if (rs.nil?)
+      @db.execute('INSERT INTO userreviews (reviewer, uqid) VALUES (?, ?)', [rid, uqid])
+      p "uqid #{uqid} linked with reviewer #{rid}" if @verbose
+      rs = @db.get_first_row('SELECT * FROM userreviews WHERE reviewer = ? AND uqid = ?', [rid, uqid])
+    else
+      p "uqid #{uqid} link with reviewer #{rid} already exists" if @verbose
+    end
+    rs[0]
+  rescue SQLite3::Exception => e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
+    close
+    exit(1)
+  end
+
+  def urid_to_uqid(uid, rid)
+    rs = @db.get_first_row('SELECT uqid FROM userreviews WHERE reviewer = ? AND id = ?', [uid, rid])
+    return rs if (rs.nil?)
+
+    rs[0]
+  rescue SQLite3::Exception => e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
+    close
+    exit(1)
+  end
+
+  def record_review(revid, grade, review)
+    rs = @db.get_first_row('SELECT * FROM reviews WHERE revid = ?', [revid])
+    if (rs.nil?)
+      @db.execute('INSERT INTO reviews (revid, grade, review) VALUES (?, ?, ?)', [revid, grade, review])
+      p "review #{grade} #{review} created for #{revid} assignment" if @verbose
+    else
+      @db.execute('UPDATE reviews SET grade = ?, review = ? WHERE revid = ?', [grade, review, revid])
+      p "review #{grade} #{review} updated for #{revid} assignment" if @verbose
+    end
+  rescue SQLite3::Exception => e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
+    close
+    exit(1)
+  end
+
+  def query_review(revid)
+    rs = @db.get_first_row('SELECT * FROM reviews WHERE revid = ?', [revid])
+    return rs if (rs.nil?)
+
+    Review.new(rs[0], rs[1], rs[2], rs[3])
+  rescue SQLite3::Exception => e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
+    close
+    exit(1)
   end
 
   def close

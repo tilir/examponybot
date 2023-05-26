@@ -58,9 +58,7 @@ def create_db_structure(db)
   db.execute <<-SQL
     CREATE TABLE IF NOT EXISTS userreviews (
       id INTEGER PRIMARY KEY,
-      exam INTEGER,
-      revno INTEGER,
-      user INTEGER,
+      reviewer INTEGER,
       uqid INTEGER
     );
   SQL

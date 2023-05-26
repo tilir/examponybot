@@ -129,14 +129,14 @@ class Handler
     @dbl.set_exam_state(EXAM_STATE[:stopped])
   end
 
-  # send to reviewer: review id, answers to all questions
   def send_reviewing_task(api, tguser, student, reviewer)
     answs = @dbl.user_all_answers(student.id)
+    p "got #{answs.length} answers to review from #{student.userid}"
 
     answs.each do |ans|
-      # revid = @dbl.create_review_assignment(....)
-      # api.send_message(chat_id: reviewer.userid, text: ">>> Review assignment #{revid}")
-      # api.send_message(chat_id: reviewer.userid, text: ans.text)
+      revid = @dbl.create_review_assignment(reviewer.id, ans.uqid)
+      api.send_message(chat_id: reviewer.userid, text: ">>> Review assignment #{revid}")
+      api.send_message(chat_id: reviewer.userid, text: ans.text)
     end
   end
 
@@ -168,6 +168,7 @@ class Handler
       p "#{s.userid} : #{r1.userid} #{r2.userid} #{r3.userid}" if @verbose
       send_reviewing_task(api, tguser, s, r1)
       send_reviewing_task(api, tguser, s, r2)
+      # if we will decide to make 3 reviewers, for beta-testing 2 enough
       # send_reviewing_task(api, tguser, s, r3)
     end
   end
@@ -279,18 +280,25 @@ class Handler
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_user(api, dbuser, tguser) == -1)
 
+    st = @dbl.read_exam_state
     if (st != EXAM_STATE[:reviewing])
-      api.send_message(chat_id: tguser.id, text: "Exam not accepting answers now")
+      api.send_message(chat_id: tguser.id, text: "Exam not accepting reviews now")
       return
     end
 
     re = /(\d+)\s+(\d+)\s+(.+)/m
     m = rest.match(re).to_a
-    r = m[1].to_i
+    urid = m[1].to_i
     g = m[2].to_i
     t = m[3]
 
-    # record review and grade
+    uqid = @dbl.urid_to_uqid(dbuser.id, urid)
+    if uqid.nil?
+      api.send_message(chat_id: tguser.id, text: "#{urid} is not your review assignment")
+      return
+    end
+
+    @dbl.record_review(urid, g, t)
   end
 
   def lookup_review(api, tguser, rest)
@@ -299,9 +307,15 @@ class Handler
 
     re = /(\d+)/m
     m = rest.match(re).to_a
-    n = m[1].to_i
+    urid = m[1].to_i
 
-    # send review back to user
+    uqid = @dbl.urid_to_uqid(dbuser.id, urid)
+    if uqid.nil?
+      api.send_message(chat_id: tguser.id, text: "#{urid} is not your review assignment")
+      return
+    end
+    review = @dbl.query_review(urid)
+    api.send_message(chat_id: tguser.id, text: "#{urid} review info. Grade: #{review.grade}. Text: #{review.text}")
   end
 
   def print_help
@@ -310,7 +324,7 @@ class Handler
     /answer n text -- send answer to nth question in your exam ticket. Text can be multi-line.
     /lookup_answer n -- lookup your answer to nth question in the database.
     /review r grade text -- send review assignment r, set grade, send explanation.
-    /lookup_review r -- lookup your review to nth question in r's review in the database.
+    /lookup_review r -- lookup your review assignment in r's review in the database.
     HELP
   end
 
@@ -387,7 +401,7 @@ class Handler
       send_review(api, tguser, rest)
 
     when '/lookup_review'
-      lookup_answer(api, tguser, rest)
+      lookup_review(api, tguser, rest)
 
     when '/help'
       helptext = print_help
