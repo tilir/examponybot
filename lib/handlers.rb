@@ -173,6 +173,16 @@ class Handler
     end
   end
 
+  def due_done(user)
+    return nil if @dbl.nreviews(user.id) < 2
+
+    true
+  end
+
+  def grade_answer(answ)
+    0
+  end
+
   def set_grades(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_priv_user(api, dbuser, tguser) == -1)
@@ -184,8 +194,23 @@ class Handler
     end
     @dbl.set_exam_state(EXAM_STATE[:grading])
 
-    # lookup all review records for all registered users
-    # send back grades
+    allu = @dbl.all_answered_users
+    if allu.nil?
+      api.send_message(chat_id: tguser.id, text: "No answered users yet")
+      return
+    end
+
+    allu.each do |user|
+      if due_done(user).nil?
+        api.send_message(chat_id: user.userid, text: "You haven't done your reviewing due and you will not be graded")
+        next
+      end
+      totalgrade = 0
+      answs = @dbl.user_all_answers(user.id)
+      answs.each do |answ|
+        totalgrade += grade_answer(answ)
+      end
+    end
   end
 
   # Non-priviledged part

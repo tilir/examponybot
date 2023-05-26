@@ -291,6 +291,21 @@ class DBLayer
     exit(1)
   end
 
+  def nreviews(uid)
+    multiline = <<-SQL
+      SELECT DISTINCT reviews.id FROM userreviews
+      INNER JOIN userquestions ON userreviews.uqid = userquestions.id
+      INNER JOIN reviews ON reviews.revid = userreviews.id
+      INNER JOIN users ON users.id = userquestions.user
+      WHERE users.id = ?
+    SQL
+    rs = @db.execute(multiline, [uid])
+    return nil if rs.nil?
+
+    p "found #{rs.length} reviews from #{uid}" if @verbose
+    rs.length
+  end
+
   def create_review_assignment(rid, uqid)
     rs = @db.get_first_row('SELECT * FROM userreviews WHERE reviewer = ? AND uqid = ?', [rid, uqid])
     if (rs.nil?)

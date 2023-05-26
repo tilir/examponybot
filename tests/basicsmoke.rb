@@ -182,3 +182,6 @@ handler.process_message(api, event)
 
 event = PseudoMessage.new(student1, chat, "/lookup_review 112")
 handler.process_message(api, event)
+
+event = PseudoMessage.new(prepod, chat, "/setgrades")
+handler.process_message(api, event)
