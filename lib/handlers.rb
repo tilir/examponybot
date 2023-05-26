@@ -129,6 +129,17 @@ class Handler
     @dbl.set_exam_state(EXAM_STATE[:stopped])
   end
 
+  # send to reviewer: review id, answers to all questions
+  def send_reviewing_task(api, tguser, student, reviewer)
+    answs = @dbl.user_all_answers(student.id)
+
+    answs.each do |ans|
+      # revid = @dbl.create_review_assignment(....)
+      # api.send_message(chat_id: reviewer.userid, text: ">>> Review assignment #{revid}")
+      # api.send_message(chat_id: reviewer.userid, text: ans.text)
+    end
+  end
+
   def start_review(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_priv_user(api, dbuser, tguser) == -1)
@@ -140,8 +151,25 @@ class Handler
     end
     @dbl.set_exam_state(EXAM_STATE[:reviewing])
 
-    # determine which user have which review and send
-    # also write this data to userreviews table
+    allu = @dbl.all_answered_users
+    if allu.nil?
+      api.send_message(chat_id: tguser.id, text: "No answered users yet")
+      return
+    end
+
+    nn = @dbl.n_questions
+
+    astud = allu
+    arev1 = allu.rotate(1)
+    arev2 = allu.rotate(2)
+    arev3 = allu.rotate(3)
+
+    astud.zip(arev1, arev2, arev3).each do |s, r1, r2, r3|
+      p "#{s.userid} : #{r1.userid} #{r2.userid} #{r3.userid}" if @verbose
+      send_reviewing_task(api, tguser, s, r1)
+      send_reviewing_task(api, tguser, s, r2)
+      # send_reviewing_task(api, tguser, s, r3)
+    end
   end
 
   def set_grades(api, tguser, rest)
@@ -155,9 +183,9 @@ class Handler
     end
     @dbl.set_exam_state(EXAM_STATE[:grading])
 
-   # lookup all review records for all registered users
-   # send back grades
- end
+    # lookup all review records for all registered users
+    # send back grades
+  end
 
   # Non-priviledged part
 
@@ -223,6 +251,8 @@ class Handler
     re = /(\d+)/m
     m = rest.match(re).to_a
     n = m[1].to_i
+    nn = @dbl.n_questions
+
     if (n > nn) or (n < 1)
       api.send_message(chat_id: tguser.id, text: "Answer have incorrect number #{rest}. Please see /help.")
       return
@@ -254,7 +284,12 @@ class Handler
       return
     end
 
-    # lookup userreviews id
+    re = /(\d+)\s+(\d+)\s+(.+)/m
+    m = rest.match(re).to_a
+    r = m[1].to_i
+    g = m[2].to_i
+    t = m[3]
+
     # record review and grade
   end
 
@@ -262,16 +297,20 @@ class Handler
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_user(api, dbuser, tguser) == -1)
 
-    # lookup userquestions id
-    # send answer back to user
+    re = /(\d+)/m
+    m = rest.match(re).to_a
+    n = m[1].to_i
+
+    # send review back to user
   end
 
   def print_help
     <<-HELP
     /register -- register yourself as a user.
     /answer n text -- send answer to nth question in your exam ticket. Text can be multi-line.
-    /lookup [n] -- lookup your answer to nth question in the database. Without n returns all answers.
-    /review user n grade text -- send review to nth question from user, set grade, send explanation.
+    /lookup_answer n -- lookup your answer to nth question in the database.
+    /review r grade text -- send review assignment r, set grade, send explanation.
+    /lookup_review r -- lookup your review to nth question in r's review in the database.
     HELP
   end
 

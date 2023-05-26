@@ -115,3 +115,52 @@ handler.process_message(api, event)
 
 event = PseudoMessage.new(student3, chat, "/answer 1 singleline from student3")
 handler.process_message(api, event)
+
+event = PseudoMessage.new(student3, chat, "/lookup_answer 1")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student3, chat, "/lookup_answer 2")
+handler.process_message(api, event)
+
+a21 = <<~ANS
+  /answer 2
+  УХ
+  как я
+  отвечаю
+ANS
+a22 = <<~ANS
+  /answer 2
+  ЭХ
+  как я
+  отвечаю
+ANS
+a23 = <<~ANS
+  /answer 2
+  ЫХ
+  как я
+  отвечаю
+ANS
+
+event = PseudoMessage.new(student1, chat, a21)
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student2, chat, a22)
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student3, chat, a23)
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student3, chat, "/lookup_answer 2")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/answer 3 singleline from student1")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student2, chat, "/answer 3 singleline from student2")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student3, chat, "/answer 3 singleline from student3")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(prepod, chat, "/startreview")
+handler.process_message(api, event)

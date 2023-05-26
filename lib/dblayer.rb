@@ -209,13 +209,49 @@ class DBLayer
   def user_nth_question(uid, n)
     multiline = <<-SQL
       SELECT userquestions.id FROM userquestions
-      LEFT JOIN questions ON userquestions.question = questions.id
+      INNER JOIN questions ON userquestions.question = questions.id
       WHERE userquestions.user = ? AND questions.number = ?
     SQL
     rs = @db.get_first_row("#{multiline}", [uid, n])
     return nil if rs.nil?
 
     rs[0]
+  end
+
+  def collect_answers(rs)
+    answers = []
+    return answers if rs.nil?
+
+    rs.each do |row|
+      next if row[1].nil? or row[2].nil?
+
+      answers.append Answer.new(row[0], row[1], row[2])
+    end
+    answers
+  end
+
+  def user_all_answers(uid)
+    multiline = <<-SQL
+      SELECT DISTINCT answers.* FROM userquestions
+      INNER JOIN answers ON userquestions.id = answers.uqid
+      WHERE userquestions.user = ?
+    SQL
+    rs = @db.execute(multiline)
+    return nil if rs.nil?
+
+    collect_answers(rs)
+  end
+
+  def all_answered_users
+    multiline = <<-SQL
+      SELECT DISTINCT users.* FROM userquestions
+      INNER JOIN users ON users.id = userquestions.user
+      INNER JOIN answers ON userquestions.id = answers.uqid
+    SQL
+    rs = @db.execute(multiline)
+    return nil if rs.nil?
+
+    collect_users(rs)
   end
 
   def record_answer(uqid, t)
