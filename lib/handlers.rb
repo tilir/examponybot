@@ -11,6 +11,8 @@
 
 require_relative './dblayer'
 
+N_REVIEWERS = 2
+
 class Handler
   def initialize(dbname, verbose)
     @dbl = DBLayer.new(dbname, verbose)
@@ -135,8 +137,15 @@ class Handler
 
     answs.each do |ans|
       revid = @dbl.create_review_assignment(reviewer.id, ans.uqid)
-      api.send_message(chat_id: reviewer.userid, text: ">>> Review assignment #{revid}")
-      api.send_message(chat_id: reviewer.userid, text: ans.text)
+      qst = @dbl.uqid_to_question(ans.uqid)
+      txt = <<~TXT
+        Review assignment: #{revid}
+        --- Question ---
+        #{qst.text}
+        --- Answer ---
+        #{ans.text}
+      TXT
+      api.send_message(chat_id: reviewer.userid, text: txt)
     end
   end
 
@@ -169,18 +178,40 @@ class Handler
       send_reviewing_task(api, tguser, s, r1)
       send_reviewing_task(api, tguser, s, r2)
       # if we will decide to make 3 reviewers, for beta-testing 2 enough
-      # send_reviewing_task(api, tguser, s, r3)
+      send_reviewing_task(api, tguser, s, r3) if N_REVIEWERS == 3
     end
   end
 
-  def due_done(user)
-    return nil if @dbl.nreviews(user.id) < 2
+  def qualify_users(api, tguser, userreq)
+    allu = @dbl.all_answered_users
+    if allu.nil?
+      api.send_message(chat_id: tguser.id, text: "No answered users yet")
+      return []
+    end
 
-    true
+    qualified = []
+    allu.each do |user|
+      userrevs = @dbl.nreviews(user.id)
+      if userrevs < userreq
+        txt = <<~TXT
+          You haven't done your reviewing due.
+          Done #{userrevs} of #{userreq}
+          You will not be graded
+        TXT
+        api.send_message(chat_id: user.userid, text: txt)
+        next
+      end
+      qualified.append(user)
+    end
+    qualified
   end
 
-  def grade_answer(answ)
-    0
+  def grade_answer(allrevs)
+    grade = 0;
+    allrevs.each do |rev|
+      grade += rev.grade
+    end
+    (grade.to_f / allrevs.length).round
   end
 
   def set_grades(api, tguser, rest)
@@ -194,22 +225,40 @@ class Handler
     end
     @dbl.set_exam_state(EXAM_STATE[:grading])
 
-    allu = @dbl.all_answered_users
-    if allu.nil?
-      api.send_message(chat_id: tguser.id, text: "No answered users yet")
-      return
-    end
+    nn = @dbl.n_questions
+    nv = @dbl.n_variants
+    userreq = nv * N_REVIEWERS
 
-    allu.each do |user|
-      if due_done(user).nil?
-        api.send_message(chat_id: user.userid, text: "You haven't done your reviewing due and you will not be graded")
-        next
-      end
+    qualified = qualify_users(api, tguser, userreq)
+    qualified.each do |user|
       totalgrade = 0
       answs = @dbl.user_all_answers(user.id)
       answs.each do |answ|
-        totalgrade += grade_answer(answ)
+        allrevs = @dbl.allreviews(answ.uqid)
+        qst = @dbl.uqid_to_question(answ.uqid)
+        if allrevs.empty?
+          api.send_message(chat_id: user.userid, text: "Sorry, answer to question #{qst.number} had no reviews")
+          next
+        end
+        txt = <<~TXT
+          Reviews for your question #{qst.number}
+          --- Question text ---
+          #{qst.text}
+        TXT
+        api.send_message(chat_id: user.userid, text: txt)
+        allrevs.each do |rev|
+          txt = <<~TXT
+            --- Review text ---
+            #{rev.text}
+            -------------------
+            Review grade: #{rev.grade}
+          TXT
+          api.send_message(chat_id: user.userid, text: txt)
+        end
+        totalgrade += grade_answer(allrevs)
       end
+      totalgrade = (totalgrade.to_f / nn).round
+      api.send_message(chat_id: user.userid, text: "Your approx grade is #{totalgrade}")
     end
   end
 
@@ -270,6 +319,31 @@ class Handler
     api.send_message(chat_id: tguser.id, text: "Answer recorded to #{uqid}")
   end
 
+  def lookup_question(api, tguser, rest)
+    dbuser = @dbl.get_user_by_id(tguser.id)
+    return if (check_user(api, dbuser, tguser) == -1)
+
+    re = /(\d+)/m
+    m = rest.match(re).to_a
+    n = m[1].to_i
+    nn = @dbl.n_questions
+
+    if (n > nn) or (n < 1)
+      api.send_message(chat_id: tguser.id, text: "Question have incorrect number #{rest}. Allowed range: [1 .. #{nn}].")
+      return
+    end
+
+    uqid = @dbl.user_nth_question(dbuser.id, n)
+
+    if uqid.nil?
+      api.send_message(chat_id: tguser.id, text: "You don't have this question yet.")
+      return
+    end
+
+    qst = @dbl.uqid_to_question(uqid)
+    api.send_message(chat_id: tguser.id, text: qst.text)
+  end
+
   def lookup_answer(api, tguser, rest)
     dbuser = @dbl.get_user_by_id(tguser.id)
     return if (check_user(api, dbuser, tguser) == -1)
@@ -280,7 +354,7 @@ class Handler
     nn = @dbl.n_questions
 
     if (n > nn) or (n < 1)
-      api.send_message(chat_id: tguser.id, text: "Answer have incorrect number #{rest}. Please see /help.")
+      api.send_message(chat_id: tguser.id, text: "Question have incorrect number #{rest}. Allowed range: [1 .. #{nn}].")
       return
     end
 
@@ -317,6 +391,11 @@ class Handler
     g = m[2].to_i
     t = m[3]
 
+    if g < 1 or g > 10
+      api.send_message(chat_id: tguser.id, text: "Grade shall be 1 .. 10")
+      return
+    end
+
     uqid = @dbl.urid_to_uqid(dbuser.id, urid)
     if uqid.nil?
       api.send_message(chat_id: tguser.id, text: "#{urid} is not your review assignment")
@@ -324,6 +403,12 @@ class Handler
     end
 
     @dbl.record_review(urid, g, t)
+    api.send_message(chat_id: tguser.id, text: "Review assignment #{urid} recorded/updated")
+
+    nv = @dbl.n_variants
+    userreq = nv * N_REVIEWERS
+    userrevs = @dbl.nreviews(dbuser.id)
+    api.send_message(chat_id: tguser.id, text: "You sent #{userrevs} out of #{userreq} required reviews")
   end
 
   def lookup_review(api, tguser, rest)
@@ -340,16 +425,21 @@ class Handler
       return
     end
     review = @dbl.query_review(urid)
+    if review.nil?
+      api.send_message(chat_id: tguser.id, text: "#{urid} review not found")
+      return
+    end
     api.send_message(chat_id: tguser.id, text: "#{urid} review info. Grade: #{review.grade}. Text: #{review.text}")
   end
 
   def print_help
     <<-HELP
-    /register -- register yourself as a user.
+    /register [name] -- register yourself as a user.
     /answer n text -- send answer to nth question in your exam ticket. Text can be multi-line.
-    /lookup_answer n -- lookup your answer to nth question in the database.
-    /review r grade text -- send review assignment r, set grade, send explanation.
-    /lookup_review r -- lookup your review assignment in r's review in the database.
+    /lookup_question n -- lookup your nth question.
+    /lookup_answer n -- lookup your answer to nth question.
+    /review r grade text -- send review assignment r, set grade (from 1 to 10), send explanation.
+    /lookup_review r -- lookup your review assignment in r's review.
     HELP
   end
 
@@ -421,6 +511,9 @@ class Handler
 
     when '/lookup_answer'
       lookup_answer(api, tguser, rest)
+
+    when '/lookup_question'
+      lookup_question(api, tguser, rest)
 
     when '/review'
       send_review(api, tguser, rest)

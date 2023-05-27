@@ -153,6 +153,15 @@ handler.process_message(api, event)
 event = PseudoMessage.new(student3, chat, "/lookup_answer 2")
 handler.process_message(api, event)
 
+event = PseudoMessage.new(student3, chat, "/lookup_answer")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student3, chat, "/lookup_question 1")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student3, chat, "/lookup_question")
+handler.process_message(api, event)
+
 event = PseudoMessage.new(student1, chat, "/answer 3 singleline from student1")
 handler.process_message(api, event)
 
@@ -174,13 +183,58 @@ handler.process_message(api, event)
 event = PseudoMessage.new(student1, chat, "/review 12 2 don't like it")
 handler.process_message(api, event)
 
+event = PseudoMessage.new(student1, chat, "/review 12 4 like it better")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/review 13 2 don't like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/review 14 2 don't like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/review 15 2 don't like it")
+handler.process_message(api, event)
+
 event = PseudoMessage.new(student1, chat, "/review 112 2 don't like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/review 12 -1 don't like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/review 12 100 don't like it")
 handler.process_message(api, event)
 
 event = PseudoMessage.new(student1, chat, "/lookup_review 10")
 handler.process_message(api, event)
 
 event = PseudoMessage.new(student1, chat, "/lookup_review 112")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student2, chat, "/review 1 10 like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student2, chat, "/review 2 10 like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student2, chat, "/review 3 10 like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student2, chat, "/review 16 10 like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student2, chat, "/review 17 10 like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student2, chat, "/review 18 10 like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student3, chat, "/review 4 10 like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student3, chat, "/review 5 10 like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student3, chat, "/review 6 10 like it")
 handler.process_message(api, event)
 
 event = PseudoMessage.new(prepod, chat, "/setgrades")

@@ -291,19 +291,31 @@ class DBLayer
     exit(1)
   end
 
-  def nreviews(uid)
+  def uqid_to_question(uqid)
     multiline = <<-SQL
-      SELECT DISTINCT reviews.id FROM userreviews
-      INNER JOIN userquestions ON userreviews.uqid = userquestions.id
-      INNER JOIN reviews ON reviews.revid = userreviews.id
-      INNER JOIN users ON users.id = userquestions.user
-      WHERE users.id = ?
+      SELECT DISTINCT * FROM questions
+      INNER JOIN userquestions ON questions.id = userquestions.question
+      WHERE userquestions.id = ?      
     SQL
-    rs = @db.execute(multiline, [uid])
+    rs = @db.get_first_row(multiline, [uqid])
     return nil if rs.nil?
 
-    p "found #{rs.length} reviews from #{uid}" if @verbose
-    rs.length
+    return Question.new(rs[0], rs[1], rs[2], rs[3])
+  rescue SQLite3::Exception => e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
+    close
+    exit(1)
+  end
+
+  def nreviews(rid)
+    multiline = <<-SQL
+      SELECT COUNT(reviews.id) FROM reviews
+      INNER JOIN userreviews ON reviews.revid = userreviews.id
+      WHERE userreviews.reviewer = ?;
+    SQL
+    rs = @db.get_first_row(multiline, [rid])
+    p "found #{rs[0]} reviews from #{rid}" if @verbose
+    rs[0]
   end
 
   def create_review_assignment(rid, uqid)
@@ -353,6 +365,33 @@ class DBLayer
     return rs if (rs.nil?)
 
     Review.new(rs[0], rs[1], rs[2], rs[3])
+  rescue SQLite3::Exception => e
+    puts "#{__FILE__}:#{__LINE__}:#{e}"
+    close
+    exit(1)
+  end
+
+  def collect_reviews(rs)
+    reviews = []
+    return reviews if rs.nil?
+
+    rs.each do |row|
+      pp row if @verbose
+      next if row[1].nil? or row[2].nil? or row[3].nil?
+
+      reviews.append Review.new(row[0], row[1], row[2], row[3])
+    end
+    reviews
+  end
+
+  def allreviews(uqid)
+    multiline = <<-SQL
+      SELECT * FROM reviews
+      INNER JOIN userreviews ON reviews.revid = userreviews.id
+      WHERE userreviews.uqid = ?;
+    SQL
+    rs = @db.execute(multiline, [uqid])
+    collect_reviews(rs)
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
