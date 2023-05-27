@@ -45,12 +45,19 @@ class DBLayer
     rs = @db.get_first_row('SELECT * FROM users WHERE userid = ?', [id])
     return nil if rs.nil? or rs.empty?
 
-    p "got user info: #{rs[1]} #{rs[2]} #{rs[3]}" if @verbose
-    return User.new(rs[0], rs[1], rs[2], rs[3])
+    User.new(rs[0], rs[1], rs[2], rs[3])
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
+  end
+
+  def get_priviledge_for(id)
+    user = get_user_by_id(id)
+    return USER_STATE[:nonexsitent] if user.nil?
+    return USER_STATE[:priviledged] if user.privlevel == 0
+
+    USER_STATE[:regular]
   end
 
   def users_empty?

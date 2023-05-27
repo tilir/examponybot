@@ -16,6 +16,12 @@ EXAM_STATE = {
   grading: 3
 }
 
+USER_STATE = {
+  priviledged: 0,
+  regular: 1,
+  nonexistent: 2
+}
+
 def create_db_structure(db)
   db.execute <<-SQL
     CREATE TABLE IF NOT EXISTS users (

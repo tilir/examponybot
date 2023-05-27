@@ -16,7 +16,7 @@ require_relative '../lib/handlers'
 handler = Handler.new("test.db", true)
 api = PseudoApi.new
 
-prepod = PseudoUser.new(1, "prepod")
+prepod = PseudoUser.new(167346988, "Tilir")
 student1 = PseudoUser.new(2, "student1")
 student2 = PseudoUser.new(3, "student2")
 student3 = PseudoUser.new(4, "student3")
@@ -102,6 +102,9 @@ event = PseudoMessage.new(student2, chat, "/register")
 handler.process_message(api, event)
 
 event = PseudoMessage.new(student3, chat, "/register")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(prepod, chat, "/users")
 handler.process_message(api, event)
 
 event = PseudoMessage.new(prepod, chat, "/startexam")
@@ -202,6 +205,12 @@ event = PseudoMessage.new(student1, chat, "/review 12 -1 don't like it")
 handler.process_message(api, event)
 
 event = PseudoMessage.new(student1, chat, "/review 12 100 don't like it")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/review")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(student1, chat, "/review 9.5")
 handler.process_message(api, event)
 
 event = PseudoMessage.new(student1, chat, "/lookup_review 10")

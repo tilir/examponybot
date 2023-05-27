@@ -11,7 +11,7 @@
 
 require_relative './dblayer'
 
-N_REVIEWERS = 2
+N_REVIEWERS = 3
 
 class Handler
   def initialize(dbname, verbose)
@@ -433,14 +433,31 @@ class Handler
   end
 
   def print_help
-    <<-HELP
-    /register [name] -- register yourself as a user.
-    /answer n text -- send answer to nth question in your exam ticket. Text can be multi-line.
-    /lookup_question n -- lookup your nth question.
-    /lookup_answer n -- lookup your answer to nth question.
-    /review r grade text -- send review assignment r, set grade (from 1 to 10), send explanation.
-    /lookup_review r -- lookup your review assignment in r's review.
+    t = <<~HELP
+      /register [name] -- register yourself as a user.
+      /answer n text -- send answer to nth question in your exam ticket. Text can be multi-line.
+      /lookup_question n -- lookup your nth question.
+      /lookup_answer n -- lookup your answer to nth question.
+      /review r grade text -- send review assignment r, set grade (from 1 to 10), send explanation.
+      /lookup_review r -- lookup your review assignment in r's review.
     HELP
+    t
+  end
+
+  def print_priviledged_help
+    t = <<~HELP
+      /addquestion n v text
+      /questions
+      /users
+      /addexam
+      /startexam
+      /startreview
+      /setgrades
+      /stopexam
+      /reload
+      /exit
+    HELP
+    t
   end
 
   # returns true if we need to exit
@@ -457,12 +474,14 @@ class Handler
     tgchat = message.chat
     p "C: #{command} from <#{tguser.id}> in chat <#{tgchat.id}> with rest <#{rest}>" if @verbose
     case command
-    # add exam question (priviledged only)
-    # /add n v text
+
+    # --- priviledged part
+
+    # add exam question
     when '/addquestion'
       add_question(api, tguser, rest)
 
-    # lokup all questions (priviledged only)
+    # lokup all questions
     when '/questions'
       all_questions(api, tguser)
 
@@ -470,26 +489,23 @@ class Handler
     when '/users'
       all_users(api, tguser)
 
+    # add single exam instance
     when '/addexam'
       add_exam(api, tguser, rest)
 
-    # start exam (priviledged only)
-    # after start, users can submit answers
+    # start exam, now users can submit answers
     when '/startexam'
       start_exam(api, tguser, rest)
 
-    # start peer review (priviledged only)
-    # users can no longer submit answers and shall submit reviews
+    # start peer review, now users can submit reviews
     when '/startreview'
       start_review(api, tguser, rest)
 
-    # sets all grades
-    # users can no longer submit reviews but can query review results and grades
+    # sets all grades and sends reviews back
     when '/setgrades'
       set_grades(api, tguser, rest)
 
-    # finish exam (priviledged only)
-    # exam non-existent, everything cleaned up
+    # finish exam
     when '/stopexam'
       stop_exam(api, tguser, rest)
 
@@ -523,14 +539,20 @@ class Handler
 
     when '/help'
       helptext = print_help
-      api.send_message(chat_id: tguser.id, text: "#{helptext}")
+      api.send_message(chat_id: tguser.id, text: helptext)
+
     when '/exit'
       dbuser = @dbl.get_user_by_id(tguser.id)
       return true if (check_priv_user(api, dbuser, tguser) != -1)
+
     else
       helptext = print_help
-      api.send_message(chat_id: tguser.id, text: "Unknown command")
-      api.send_message(chat_id: tguser.id, text: "#{helptext}")
+      txt = <<~TXT
+        Unknown command #{message.text}
+        ---
+        #{helptext}
+      TXT
+      api.send_message(chat_id: tguser.id, text: txt)
     end
     return false
   end
