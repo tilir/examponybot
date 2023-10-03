@@ -13,7 +13,8 @@
 require_relative './pseudoapi'
 require_relative '../lib/handlers'
 
-handler = Handler.new("test.db", true)
+Logger.set_verbose true
+handler = Handler.new("test.db")
 api = PseudoApi.new
 
 prepod = PseudoUser.new(167346988, "Tilir")
@@ -247,4 +248,7 @@ event = PseudoMessage.new(student3, chat, "/review 6 10 like it")
 handler.process_message(api, event)
 
 event = PseudoMessage.new(prepod, chat, "/setgrades")
+handler.process_message(api, event)
+
+event = PseudoMessage.new(prepod, chat, "/stopexam")
 handler.process_message(api, event)

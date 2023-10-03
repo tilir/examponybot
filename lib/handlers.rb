@@ -14,20 +14,20 @@ require_relative './dblayer'
 N_REVIEWERS = 3
 
 class Handler
-  def initialize(dbname, verbose)
-    @dbl = DBLayer.new(dbname, verbose)
-    @dbname = dbname
-    @verbose = verbose
+  def initialize(dbname)
+    @dbl = DBLayer.new(dbname)
+    if block_given?
+      yield
+      shutdown
+    end
   end
 
   class Command
-    def initialize(api, tguser, dbl, dbname, verbose)
+    def initialize(api, tguser, dbl)
       @api = api
       @tguser = tguser
 
       @dbl = dbl
-      @dbname = dbname
-      @verbose = verbose
     end
 
     def try_call(meth, *args)
@@ -49,7 +49,7 @@ class Handler
     def register name = ""
       name = "#{@tguser.username}" if name.nil? or name == ""
       name = "#{@tguser.id}" if name.nil? or name == ""
-      p "register_user: #{name}" if @verbose
+      Logger.print "register_user: #{name}"
 
       # first user added with pedagogical priviledges
       if @dbl.users_empty?
@@ -76,7 +76,7 @@ class Handler
 
     def help
       helptext = print_help
-      api.send_message(chat_id: tguser.id, text: helptext)
+      @api.send_message(chat_id: @tguser.id, text: helptext)
     end
 
     private def print_help
@@ -150,14 +150,14 @@ class Handler
     end
 
     def addquestion rest = ""
-      p "add_question: #{rest}" if @verbose
+      Logger.print "add_question: #{rest}"
       re = /(\d+)\s+(\d+)\s+(.+)/m
       m = rest.match(re).to_a
       n = m[1]
       v = m[2]
       t = m[3]
 
-      p "add_question: #{n} #{v} #{t}" if @verbose
+      Logger.print "add_question: #{n} #{v} #{t}"
       @dbl.add_question(n, v, t)
       @api.send_message(chat_id: @tguser.id, text: "question added or updated")
     end
@@ -235,7 +235,7 @@ class Handler
       arev3 = allu.rotate(3)
 
       astud.zip(arev1, arev2, arev3).each do |s, r1, r2, r3|
-        p "#{s.userid} : #{r1.userid} #{r2.userid} #{r3.userid}" if @verbose
+        Logger.print "#{s.userid} : #{r1.userid} #{r2.userid} #{r3.userid}"
         send_reviewing_task(@api, @tguser, s, r1)
         send_reviewing_task(@api, @tguser, s, r2)
         # if we will decide to make 3 reviewers, for beta-testing 2 enough
@@ -289,8 +289,9 @@ class Handler
     end
 
     def reload
+      dbname = @dbl.name
       @dbl.close
-      @dbl = DBLayer.new(@dbname, @verbose)
+      @dbl = DBLayer.new(dbname)
     end
 
     def exit
@@ -328,7 +329,7 @@ class Handler
       t = m[2]
       nn = @dbl.n_questions
 
-      p "Answer from #{@tguser.username} to #{n} is: #{t}" if @verbose
+      Logger.print "Answer from #{@tguser.username} to #{n} is: #{t}"
 
       if (n > nn) or (n < 1)
         @api.send_message(chat_id: @tguser.id, text: "Answer have incorrect number. Please see /help.")
@@ -470,14 +471,14 @@ class Handler
 
   private def get_command(api, tguser)
     dbuser = @dbl.get_user_by_id(tguser.id)
-    return Command.new(api, tguser, @dbl, @dbname, @verbose) if (check_user(dbuser) == -1)
-    return NonPriviledgedCommand.new(api, tguser, @dbl, @dbname, @verbose) if (check_priv_user(dbuser) == -1)
-    PriviledgedCommand.new(api, tguser, @dbl, @dbname, @verbose)
+    return Command.new(api, tguser, @dbl) if (check_user(dbuser) == -1)
+    return NonPriviledgedCommand.new(api, tguser, @dbl) if (check_priv_user(dbuser) == -1)
+    PriviledgedCommand.new(api, tguser, @dbl)
   end
 
   # returns true if we need to exit
   def process_message(api, message)
-    p "process_message: #{message.text}" if @verbose
+    Logger.print "process_message: #{message.text}"
     return false if message.text.nil?
     return false if not message.text.start_with?('/')
 
@@ -487,7 +488,7 @@ class Handler
     rest = matches[2]
     tguser = message.from
     tgchat = message.chat
-    p "C: /#{command} from <#{tguser.id}> in chat <#{tgchat.id}> with rest <#{rest}>" if @verbose
+    Logger.print "C: /#{command} from <#{tguser.id}> in chat <#{tgchat.id}> with rest <#{rest}>"
 
     cmnd = get_command(api, tguser)
     rest.empty? ? cmnd.try_call(command) : cmnd.try_call(command, rest)

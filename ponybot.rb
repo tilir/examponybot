@@ -49,7 +49,8 @@ end
 
 def main
   options = parse_options
-  handler = Handler.new(options[:dbname], options[:verbose])
+  Logger.set_verbose options[:verbose]
+  handler = Handler.new(options[:dbname])
   finish = false
   first = true
   Telegram::Bot::Client.run(options[:token]) do |bot|
