@@ -17,7 +17,7 @@ class Handler
   def initialize(dbname)
     @dbl = DBLayer.new(dbname)
     if block_given?
-      yield
+      yield self
       shutdown
     end
   end
@@ -316,6 +316,15 @@ class Handler
   end
 
   class NonPriviledgedCommand < Command
+    private def check_question_number n
+      nn = @dbl.n_questions
+      if (n > nn) or (n < 1)
+        @api.send_message(chat_id: @tguser.id, text: "Question have incorrect number #{n}. Allowed range: [1 .. #{nn}].")
+        return false
+      end
+      true
+    end
+
     def answer rest = ""
       st = @dbl.read_exam_state
       if (st != EXAM_STATE[:answering])
@@ -327,14 +336,11 @@ class Handler
       m = rest.match(re).to_a
       n = m[1].to_i
       t = m[2]
-      nn = @dbl.n_questions
 
       Logger.print "Answer from #{@tguser.username} to #{n} is: #{t}"
 
-      if (n > nn) or (n < 1)
-        @api.send_message(chat_id: @tguser.id, text: "Answer have incorrect number. Please see /help.")
-        return
-      end
+      return unless check_question_number n
+
       dbuser = @dbl.get_user_by_id(@tguser.id)
       uqid = @dbl.user_nth_question(dbuser.id, n)
       @dbl.record_answer(uqid, t)
@@ -345,12 +351,8 @@ class Handler
       re = /(\d+)/m
       m = rest.match(re).to_a
       n = m[1].to_i
-      nn = @dbl.n_questions
 
-      if (n > nn) or (n < 1)
-        @api.send_message(chat_id: @tguser.id, text: "Question have incorrect number #{@rest}. Allowed range: [1 .. #{nn}].")
-        return
-      end
+      return unless check_question_number n
 
       dbuser = @dbl.get_user_by_id(@tguser.id)
       uqid = @dbl.user_nth_question(dbuser.id, n)
@@ -368,12 +370,8 @@ class Handler
       re = /(\d+)/m
       m = rest.match(re).to_a
       n = m[1].to_i
-      nn = @dbl.n_questions
 
-      if (n > nn) or (n < 1)
-        @api.send_message(chat_id: @tguser.id, text: "Question have incorrect number #{@rest}. Allowed range: [1 .. #{nn}].")
-        return
-      end
+      return unless check_question_number n
 
       dbuser = @dbl.get_user_by_id(@tguser.id)
       uqid = @dbl.user_nth_question(dbuser.id, n)

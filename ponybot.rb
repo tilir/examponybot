@@ -50,18 +50,20 @@ end
 def main
   options = parse_options
   Logger.set_verbose options[:verbose]
-  handler = Handler.new(options[:dbname])
-  finish = false
-  first = true
-  Telegram::Bot::Client.run(options[:token]) do |bot|
-    bot.listen do |event|
-      finish = handler.process_message(bot.api, event) if event.class == Telegram::Bot::Types::Message
-      break if finish and not first
+  Handler.new(options[:dbname]) do |handler|
+    finish = false
+    first = true
+    Telegram::Bot::Client.run(options[:token]) do |bot|
+      bot.listen do |event|
+        finish = handler.process_message(bot.api, event) if event.class == Telegram::Bot::Types::Message
+        break if finish and not first
 
-      first = false
+        first = false
+      end
     end
   end
-  handler.shutdown
+rescue DBLayerError => e
+  puts "[[DBLayerError]] #{e}"
 end
 
 # main program start
