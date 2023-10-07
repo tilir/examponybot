@@ -87,26 +87,31 @@ class User
   attr_reader :username
   attr_reader :privlevel
 
-  def initialize(db, userid, username = None, privlevel = None)
-    if (not (user = db.get_user_by_id(userid)).nil?)
-      @db = db
+  def initialize(dbl, userid, username = nil, privlevel = nil)
+    if (not (user = dbl.get_user_by_id(userid.id)).nil?)
+      @dbl = dbl
       @id = user[0]
       @userid = user[1]
-      @username = user.username[2]
-      return @privlevel = user.privlevel[3]
+      @username = user[2]
+      @privlevel = user[3]
+      return
     end
-    if (username != None and privlevel != None)
-      @db = db
-      @id = db.add_user(userid, privlevel, username)
+    if (username != nil and privlevel != nil)
+      @dbl = dbl
+      @id = dbl.add_user(userid, privlevel, username)
       @userid = userid
       @username = username
-      return @privlevel = privlevel
-    end    
+      @privlevel = privlevel
+      return
+    end  
     raise DBLayerError.new "tried to get unregistered user"
   end
 
-  def update_name(name) = @db.update_user(@userid, @privlevel, name)
-  def all_answers = @db.user_all_answers @userid
+  def nth_question(examid, n) = @dbl.user_nth_question(examid, @userid.id, n)
+  def n_reviews = @dbl.nreviews @userid.id
+  def update_name(name) = @dbl.update_user(@userid, @privlevel, name)
+  def all_answers = @dbl.user_all_answers @id
+  def to_userquestion(revid) = @dbl.urid_to_uqid(@userid.id, revid)
 end
 
 class Question
@@ -115,23 +120,26 @@ class Question
   attr_reader :variant
   attr_reader :text
 
-  def initialize(db, number, variant, text = None)
-    if (not (question = db.get_question(number, variant)).nil?)
-      @db = db
+  def initialize(dbl, number, variant, text = nil)
+    if (not (question = dbl.get_question(number, variant)).nil?)
+      @dbl = dbl
       @id = question[0]
       @number = question[1]
       @variant = question[2]
-      return @text = question[3]
+      @text = question[3]
+      return 
     end
-    if (text != None)
-      @db = db
-      @id = db.add_question(number, variant, text)
+    if (text != nil)
+      @dbl = dbl
+      @id = dbl.add_question(number, variant, text)
       @number = number
       @variant = variant
-      return @text = text
+      @text = text
+      return
     end    
     raise DBLayerError.new "tried to get unregistered question"
   end
+  def to_answer = @dbl.qid_to_answer @id
 end
 
 class Exam
@@ -139,20 +147,21 @@ class Exam
   attr_reader :name
   attr_reader :state
 
-  def initialize(db, name)
-    if (not (exam = db.get_exam(name)).nil?)
-      @db = db
+  def initialize(dbl, name)
+    if (not (exam = dbl.get_exam(name)).nil?)
+      @dbl = dbl
       @id = exam[0]
       @state = exam[1]
-      return @name = exam[2]
+      @name = exam[2]
+      return
     end
-    @db = db
-    @id = db.add_exam(name)
+    @dbl = dbl
+    @id = dbl.add_exam(name)
     @state = 0
     @name = name
   end
 
-  def set_state(state) = @db.set_exam_state(@name, @state)
+  def set_state(state) = @dbl.set_exam_state(@name, @state)
 end
 
 class UserQuestion 
@@ -161,52 +170,39 @@ class UserQuestion
   attr_reader :userid
   attr_reader :questionid
 
-  # f = true - register
-  # f = false - nth
-  def initialize(db, examid, userid, questionid, f)
-    if (f)
-      @db = db
-      @id = db.register_question(examid, userid, questionid)
-      @examid = examid
-      @userid = userid
-      @questionid = questionid
-    else   
-      userquestion = db.user_nth_question(examid, userid, questionid)
-      @db = db
-      @id = userquestion[0]
-      @examid = userquestion[1]
-      @userid = userquestion[2]
-      @questionid = userquestion[3]
-    end
-    raise DBLayerError.new "unregistered userquestion"
-  end
-
-  def to_question
-    question = @db.uqid_to_question @id
-    Question.new(db, question[1], question[2], question[3])
+  def initialize(dbl, examid, userid, questionid)
+    @dbl = dbl
+    @id = dbl.register_question(examid, userid, questionid)
+    @examid = examid
+    @userid = userid
+    @questionid = questionid
   end
 end
 
 class Answer
   attr_reader :id
-  attr_reader :uqid
+  attr_reader :qid
   attr_reader :text
 
-  def initialize(db, uqid, text = None)
-    if (not (answer = db.uqid_to_answer(uqid)).nil?)
-      @db = db
+  def initialize(dbl, qid, text = nil)
+    if (not (answer = dbl.qid_to_answer(qid)).nil?)
+      @dbl = dbl
       @id = answer[0]
       @uqid = answer[1]
-      return @text = answer[2]
+      @text = answer[2]
+      return
     end
-    if (text != None)
-      @db = db
-      @id = db.record_answer(uqid, text)
-      @uqid = uqid
-      return @text = text
+    if (text != nil)
+      @dbl = dbl
+      @id = dbl.record_answer(qid, text)
+      @qid = qid
+      @text = text
+      return
     end
   raise DBLayerError.new "unregistered answer"
   end
+
+  def all_reviews = @dbl.allreviews @uqid
 end
 
 class UserReview 
@@ -214,16 +210,12 @@ class UserReview
   attr_reader :userid
   attr_reader :userquestionid
 
-  def initialize(db, userid, userquestionid)
-    @db = db
-    @id = db.create_review_assignment(userid, userquestionid)
+  def initialize(dbl, userid, userquestionid)
+    @dbl = dbl
+    @id = dbl.create_review_assignment(userid, userquestionid)
     @userid = userid
     @userquestionid = userquestionid
-    raise DBLayerError.new "unregistered userreview"
   end
-
-  def n_reviews = @db.nreviews @userid
-  def all_reviews = @db.allreviews @userquestionid
 end
 
 class Review
@@ -231,20 +223,22 @@ class Review
   attr_reader :revid
   attr_reader :grade
   attr_reader :text
-  def initialize(db, revid, grade = None, text = None)
-    if (not (review = db.query_review revid).nil?)
-      @db = db
+  def initialize(dbl, revid, grade = nil, text = nil)
+    if (not (review = dbl.query_review revid).nil?)
+      @dbl = dbl
       @id = review[0]
       @revid = review[1]
       @grade = review[2]
-      return @text = review[3]
+      @text = review[3]
+      return
     end
-    if (grade != None and text != None)
-      @db = db
-      @id = db.record_review(revid, grade, text)
+    if (grade != nil and text != nil)
+      @dbl = dbl
+      @id = dbl.record_review(revid, grade, text)
       @revid = revid
       @grade = grade
-      return @text = text
+      @text = text
+      return
     end
     raise DBLayerError.new "unregistered review"
   end

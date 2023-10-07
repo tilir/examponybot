@@ -53,25 +53,20 @@ class Handler
 
       # first user added with pedagogical priviledges
       if @dbl.users_empty?
-        @dbl.add_user(@tguser, 0, name)
+        User.new(@dbl, @tguser, 0, name)
         @api.send_message(chat_id: @tguser.id, text: "Registered (priviledged) as #{name}")
         return
       end
 
-      if (not @dbl.exams_empty? and @dbl.read_exam_state != EXAM_STATE[:stopped])
+      if (not @dbl.exams_empty? and Exam.new(@dbl, "exam").state != EXAM_STATE[:stopped])
         @api.send_message(chat_id: @tguser.id, text: "Exam currently not in stopped mode")
         return
       end
 
       # subsequent users added with student privileges
-      dbuser = @dbl.get_user_by_id(@tguser.id)
-      if (dbuser.nil?)
-        @dbl.add_user(@tguser, 1, name)
-        @api.send_message(chat_id: @tguser.id, text: "Registered as #{name}")
-      else
-        @dbl.update_user(@tguser, 1, name)
-        @api.send_message(chat_id: @tguser.id, text: "Reg info updated to: #{name}")
-      end
+      User.new(@dbl, @tguser, 1, name)
+      #TODO: conditional message
+      @api.send_message(chat_id: @tguser.id, text: "Registered as #{name}")
     end
 
     def help
@@ -98,7 +93,7 @@ class Handler
   
       qualified = []
       allu.each do |user|
-        userrevs = @dbl.nreviews(user.id)
+        userrevs = user.nreviews
         if userrevs < userreq
           txt = <<~TXT
             You haven't done your reviewing due.
@@ -122,14 +117,14 @@ class Handler
     end
   
     private def send_reviewing_task(api, tguser, student, reviewer)
-      answs = @dbl.user_all_answers(student.id)
+      answs = student.all_answers
       p "got #{answs.length} answers to review from #{student.userid}"
   
       answs.each do |ans|
-        revid = @dbl.create_review_assignment(reviewer.id, ans.uqid)
-        qst = @dbl.uqid_to_question(ans.uqid)
+        review = UserReview.new(@dbl, reviewer.id, ans.uqid)
+        qst = ans.to_question
         txt = <<~TXT
-          Review assignment: #{revid}
+          Review assignment: #{review.id}
           --- Question ---
           #{qst.text}
           --- Answer ---
@@ -158,7 +153,7 @@ class Handler
       t = m[3]
 
       Logger.print "add_question: #{n} #{v} #{t}"
-      @dbl.add_question(n, v, t)
+      Question.new(@dbl, n, v, t)
       @api.send_message(chat_id: @tguser.id, text: "question added or updated")
     end
 
@@ -179,7 +174,7 @@ class Handler
 
     def addexam
       if @dbl.exams_empty?
-        @dbl.add_exam("exam")
+        Exam.new(@dbl, "exam")
         @api.send_message(chat_id: @tguser.id, text: "Exam added")
       else
         @api.send_message(chat_id: @tguser.id, text: "Exam already exists, currently only one exam possible")
@@ -187,12 +182,12 @@ class Handler
     end
 
     def startexam
-      st = @dbl.read_exam_state
-      if (st != EXAM_STATE[:stopped])
+      exam = Exam.new(@dbl, "exam")
+      if (exam.state != EXAM_STATE[:stopped])
         @api.send_message(chat_id: @tguser.id, text: "Exam currently not in stopped mode")
         return
       end
-      @dbl.set_exam_state(EXAM_STATE[:answering])
+      exam.set_state(EXAM_STATE[:answering])
 
       allu = @dbl.all_nonpriv_users
       nn = @dbl.n_questions
@@ -202,24 +197,24 @@ class Handler
       allu.each do |dbuser|
         (1..nn).each do |n|
           v = prng.rand(1..nv)
-          q = @dbl.get_question(n, v)
-          @dbl.register_question(dbuser.id, q.id)
+          q = Question.new(@dbl, n, v)
+          UserQuestion.new(@dbl, exam.id, dbuser.id, q.id)
           @api.send_message(chat_id: dbuser.userid, text: "Question #{n}, variant #{v}: #{q.text}")
         end
       end
     end
 
     def stopexam
-      @dbl.set_exam_state(EXAM_STATE[:stopped])
+      Exam.new(@dbl, "exam").set_state(EXAM_STATE[:stopped])
     end
 
     def startreview
-      st = @dbl.read_exam_state
-      if (st != EXAM_STATE[:answering])
+      exam = Exam.new(@dbl, "exam")
+      if (exam.state != EXAM_STATE[:answering])
         @api.send_message(chat_id: @tguser.id, text: "Exam currently not in answering mode")
         return
       end
-      @dbl.set_exam_state(EXAM_STATE[:reviewing])
+      exam.set_state(EXAM_STATE[:reviewing])
 
       allu = @dbl.all_answered_users
       if allu.nil?
@@ -244,12 +239,12 @@ class Handler
     end
 
     def setgrades
-      st = @dbl.read_exam_state
-      if (st != EXAM_STATE[:reviewing])
+      exam = Exam.new(@dbl, "exam")
+      if (exam.state != EXAM_STATE[:reviewing])
         @api.send_message(chat_id: @tguser.id, text: "Exam currently not in reviewing mode")
         return
       end
-      @dbl.set_exam_state(EXAM_STATE[:grading])
+      exam.set_state(EXAM_STATE[:grading])
 
       nn = @dbl.n_questions
       nv = @dbl.n_variants
@@ -258,10 +253,10 @@ class Handler
       qualified = qualify_users(@api, @tguser, userreq)
       qualified.each do |user|
         totalgrade = 0
-        answs = @dbl.user_all_answers(user.id)
+        answs = user.all_answers
         answs.each do |answ|
-          allrevs = @dbl.allreviews(answ.uqid)
-          qst = @dbl.uqid_to_question(answ.uqid)
+          allrevs = answ.allreviews
+          qst = answ.to_question
           if allrevs.empty?
             @api.send_message(chat_id: user.userid, text: "Sorry, answer to question #{qst.number} had no reviews")
             next
@@ -326,8 +321,8 @@ class Handler
     end
 
     def answer rest = ""
-      st = @dbl.read_exam_state
-      if (st != EXAM_STATE[:answering])
+      exam = Exam.new(@dbl, "exam")
+      if (exam.state != EXAM_STATE[:answering])
         @api.send_message(chat_id: @tguser.id, text: "Exam not accepting answers now")
         return
       end
@@ -341,10 +336,10 @@ class Handler
 
       return unless check_question_number n
 
-      dbuser = @dbl.get_user_by_id(@tguser.id)
-      uqid = @dbl.user_nth_question(dbuser.id, n)
-      @dbl.record_answer(uqid, t)
-      @api.send_message(chat_id: @tguser.id, text: "Answer recorded to #{uqid}")
+      dbuser = User.new(@dbl, @tguser)
+      qst = dbuser.nth_question(exam.id, n)
+      Answer.new(@dbl, qst.id, t)
+      @api.send_message(chat_id: @tguser.id, text: "Answer recorded to #{qst.id}")
     end
 
     def lookup_question rest = ""
@@ -354,15 +349,15 @@ class Handler
 
       return unless check_question_number n
 
-      dbuser = @dbl.get_user_by_id(@tguser.id)
-      uqid = @dbl.user_nth_question(dbuser.id, n)
+      exam = Exam.new(@dbl, "exam")
+      dbuser = User.new(@dbl, @tguser)
+      qst = dbuser.nth_question(exam.id, n)
 
-      if uqid.nil?
+      if qst.nil?
         @api.send_message(chat_id: @tguser.id, text: "You don't have this question yet.")
         return
       end
 
-      qst = @dbl.uqid_to_question(uqid)
       @api.send_message(chat_id: @tguser.id, text: qst.text)
     end
 
@@ -373,15 +368,16 @@ class Handler
 
       return unless check_question_number n
 
-      dbuser = @dbl.get_user_by_id(@tguser.id)
-      uqid = @dbl.user_nth_question(dbuser.id, n)
+      exam = Exam.new(@dbl, "exam")
+      dbuser = User.new(@dbl, @tguser)
+      qst = dbuser.nth_question(exam.id, n)
 
-      if uqid.nil?
+      if qst.nil?
         @api.send_message(chat_id: @tguser.id, text: "You don't have this question yet.")
         return
       end
 
-      answ = @dbl.uqid_to_answer(uqid)
+      answ = qst.to_answer
 
       if (answ.nil?)
         @api.send_message(chat_id: @tguser.id, text: "You haven't answered yet.")
@@ -390,10 +386,10 @@ class Handler
 
       @api.send_message(chat_id: @tguser.id, text: answ.text)
     end
-
+    
     def review rest = ""
-      st = @dbl.read_exam_state
-      if (st != EXAM_STATE[:reviewing])
+      exam = Exam.new(@dbl, "exam")
+      if (exam.state != EXAM_STATE[:reviewing])
         @api.send_message(chat_id: @tguser.id, text: "Exam not accepting reviews now")
         return
       end
@@ -409,19 +405,19 @@ class Handler
         return
       end
 
-      dbuser = @dbl.get_user_by_id(@tguser.id)
-      uqid = @dbl.urid_to_uqid(dbuser.id, urid)
+      dbuser = User.new(@dbl, @tguser)
+      uqid = dbuser.to_userquestion(urid)
       if uqid.nil?
         @api.send_message(chat_id: @tguser.id, text: "#{urid} is not your review assignment")
         return
       end
 
-      @dbl.record_review(urid, g, t)
+      Review.new(@dbl, urid, g, t)
       @api.send_message(chat_id: @tguser.id, text: "Review assignment #{urid} recorded/updated")
 
       nv = @dbl.n_variants
       userreq = nv * N_REVIEWERS
-      userrevs = @dbl.nreviews(dbuser.id)
+      userrevs = dbuser.nreviews
       @api.send_message(chat_id: @tguser.id, text: "You sent #{userrevs} out of #{userreq} required reviews")
     end
 
@@ -430,13 +426,13 @@ class Handler
       m = rest.match(re).to_a
       urid = m[1].to_i
 
-      dbuser = @dbl.get_user_by_id(@tguser.id)
-      uqid = @dbl.urid_to_uqid(dbuser.id, urid)
+      dbuser = User.new(@dbl, @tguser)
+      uqid = dbuser.to_userquestion(urid)
       if uqid.nil?
         @api.send_message(chat_id: @tguser.id, text: "#{urid} is not your review assignment")
         return
       end
-      review = @dbl.query_review(urid)
+      review = Review(@dbl, urid)
       if review.nil?
         @api.send_message(chat_id: @tguser.id, text: "#{urid} review not found")
         return
@@ -468,7 +464,7 @@ class Handler
   end
 
   private def get_command(api, tguser)
-    dbuser = @dbl.get_user_by_id(tguser.id)
+    dbuser = User.new(@dbl, tguser)
     return Command.new(api, tguser, @dbl) if (check_user(dbuser) == -1)
     return NonPriviledgedCommand.new(api, tguser, @dbl) if (check_priv_user(dbuser) == -1)
     PriviledgedCommand.new(api, tguser, @dbl)

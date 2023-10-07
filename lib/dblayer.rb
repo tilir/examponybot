@@ -91,7 +91,7 @@ class DBLayer
       Logger.print row
       next if row[1].nil? or row[2].nil? or row[3].nil?
 
-      users.append User.new(row[0], row[1], row[2], row[3])
+      users.append User.new(self, row[1])
     end
     users
   end
@@ -138,7 +138,7 @@ class DBLayer
       Logger.print row
       next if row[1].nil? or row[2].nil? or row[3].nil?
 
-      questions.append Question.new(row[0], row[1], row[2], row[3])
+      questions.append Question.new(self, row[1], row[2])
     end
     questions
   rescue SQLite3::Exception => e
@@ -246,14 +246,14 @@ class DBLayer
 
   def user_nth_question(eid, uid, n)
     multiline = <<-SQL
-      SELECT * FROM userquestions
+      SELECT questions.* FROM userquestions
       INNER JOIN questions ON userquestions.question = questions.id
-      WHERE userquestions.user = ? AND userquestions.user = ? AND questions.number = ?
+      WHERE userquestions.exam = ? AND userquestions.user = ? AND questions.number = ?
     SQL
     rs = @db.get_first_row("#{multiline}", [eid, uid, n])
     return nil if rs.nil?
 
-    [rs[0], rs[1], rs[2], rs[3]]
+    Question.new(self, rs[1], rs[2], rs[3])
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
@@ -268,7 +268,7 @@ class DBLayer
       Logger.print row
       next if row[1].nil? or row[2].nil?
 
-      answers.append Answer.new(row[0], row[1], row[2])
+      answers.append Answer.new(self, row[1])
     end
     answers
   end
@@ -303,15 +303,15 @@ class DBLayer
     exit(1)
   end
 
-  def record_answer(uqid, t)
-    rs = @db.get_first_row('SELECT * FROM answers WHERE uqid = ?', [uqid])
+  def record_answer(qid, t)
+    rs = @db.get_first_row('SELECT * FROM answers WHERE qid = ?', [uqid])
     if (rs.nil?)
-      @db.execute('INSERT INTO answers (uqid, answer) VALUES (?, ?)', [uqid, t])
-      Logger.print "answer #{t} recorded for #{uqid}"
-      rs = @db.get_first_row('SELECT * FROM answers WHERE uqid = ?', [uqid])
+      @db.execute('INSERT INTO answers (qid, answer) VALUES (?, ?)', [qid, t])
+      Logger.print "answer #{t} recorded for #{qid}"
+      rs = @db.get_first_row('SELECT * FROM answers WHERE qid = ?', [qid])
     else
       @db.execute('UPDATE answers SET answer = ? WHERE id = ?', [t, rs[0]])
-      Logger.print "answer #{t} updated for #{uqid}"
+      Logger.print "answer #{t} updated for #{qid}"
     end
     rs[0]
   rescue SQLite3::Exception => e
@@ -320,11 +320,11 @@ class DBLayer
     exit(1)
   end
 
-  def uqid_to_answer(uqid)
-    rs = @db.get_first_row('SELECT * FROM answers WHERE uqid = ?', [uqid])
+  def qid_to_answer(qid)
+    rs = @db.get_first_row('SELECT * FROM answers WHERE qid = ?', [qid])
     return nil if rs.nil?
 
-    [rs[0], rs[1], rs[2]]
+    Answer.new(self, rs[1], rs[2])
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
@@ -372,7 +372,7 @@ class DBLayer
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
-  end
+  end    
 
   # userreview.userquestionid
   def urid_to_uqid(uid, rid)
@@ -407,7 +407,7 @@ class DBLayer
     rs = @db.get_first_row('SELECT * FROM reviews WHERE revid = ?', [revid])
     return rs if (rs.nil?)
 
-    Review.new(rs[0], rs[1], rs[2], rs[3])
+    [rs[0], rs[1], rs[2], rs[3]]
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
