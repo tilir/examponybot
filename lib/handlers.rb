@@ -53,7 +53,7 @@ class Handler
 
       # first user added with pedagogical priviledges
       if @dbl.users_empty?
-        User.new(@dbl, @tguser, 0, name)
+        User.new(@dbl, @tguser.id, USER_STATE[:priviledged], name)
         @api.send_message(chat_id: @tguser.id, text: "Registered (priviledged) as #{name}")
         return
       end
@@ -64,9 +64,9 @@ class Handler
       end
 
       # subsequent users added with student privileges
-      User.new(@dbl, @tguser, 1, name)
+      User.new(@dbl, @tguser.id, USER_STATE[:regular], name)
       #TODO: conditional message
-      @api.send_message(chat_id: @tguser.id, text: "Registered as #{name}")
+      @api.send_message(chat_id: @tguser.id, text: "Registered/updated as #{name}")
     end
 
     def help
@@ -93,7 +93,7 @@ class Handler
   
       qualified = []
       allu.each do |user|
-        userrevs = user.nreviews
+        userrevs = user.n_reviews
         if userrevs < userreq
           txt = <<~TXT
             You haven't done your reviewing due.
@@ -336,10 +336,10 @@ class Handler
 
       return unless check_question_number n
 
-      dbuser = User.new(@dbl, @tguser)
-      qst = dbuser.nth_question(exam.id, n)
-      Answer.new(@dbl, qst.id, t)
-      @api.send_message(chat_id: @tguser.id, text: "Answer recorded to #{qst.id}")
+      dbuser = User.new(@dbl, @tguser.id)
+      uqst = dbuser.nth_question(exam.id, n)
+      Answer.new(@dbl, uqst.id, t)
+      @api.send_message(chat_id: @tguser.id, text: "Answer recorded to #{uqst.id}")
     end
 
     def lookup_question rest = ""
@@ -350,8 +350,15 @@ class Handler
       return unless check_question_number n
 
       exam = Exam.new(@dbl, "exam")
-      dbuser = User.new(@dbl, @tguser)
-      qst = dbuser.nth_question(exam.id, n)
+      dbuser = User.new(@dbl, @tguser.id)
+      uqst = dbuser.nth_question(exam.id, n)
+
+      if uqst.nil?
+        @api.send_message(chat_id: @tguser.id, text: "You don't have this question yet.")
+        return
+      end
+
+      qst = uqst.to_question
 
       if qst.nil?
         @api.send_message(chat_id: @tguser.id, text: "You don't have this question yet.")
@@ -369,15 +376,15 @@ class Handler
       return unless check_question_number n
 
       exam = Exam.new(@dbl, "exam")
-      dbuser = User.new(@dbl, @tguser)
-      qst = dbuser.nth_question(exam.id, n)
+      dbuser = User.new(@dbl, @tguser.id)
+      uqst = dbuser.nth_question(exam.id, n)
 
-      if qst.nil?
+      if uqst.nil?
         @api.send_message(chat_id: @tguser.id, text: "You don't have this question yet.")
         return
       end
 
-      answ = qst.to_answer
+      answ = uqst.to_answer
 
       if (answ.nil?)
         @api.send_message(chat_id: @tguser.id, text: "You haven't answered yet.")
@@ -386,7 +393,7 @@ class Handler
 
       @api.send_message(chat_id: @tguser.id, text: answ.text)
     end
-    
+
     def review rest = ""
       exam = Exam.new(@dbl, "exam")
       if (exam.state != EXAM_STATE[:reviewing])
@@ -405,7 +412,7 @@ class Handler
         return
       end
 
-      dbuser = User.new(@dbl, @tguser)
+      dbuser = User.new(@dbl, @tguser.id)
       uqid = dbuser.to_userquestion(urid)
       if uqid.nil?
         @api.send_message(chat_id: @tguser.id, text: "#{urid} is not your review assignment")
@@ -417,7 +424,7 @@ class Handler
 
       nv = @dbl.n_variants
       userreq = nv * N_REVIEWERS
-      userrevs = dbuser.nreviews
+      userrevs = dbuser.n_reviews
       @api.send_message(chat_id: @tguser.id, text: "You sent #{userrevs} out of #{userreq} required reviews")
     end
 
@@ -426,7 +433,7 @@ class Handler
       m = rest.match(re).to_a
       urid = m[1].to_i
 
-      dbuser = User.new(@dbl, @tguser)
+      dbuser = User.new(@dbl, @tguser.id)
       uqid = dbuser.to_userquestion(urid)
       if uqid.nil?
         @api.send_message(chat_id: @tguser.id, text: "#{urid} is not your review assignment")
@@ -442,7 +449,7 @@ class Handler
 
     private def print_help
       t = <<~HELP
-        /register [name] -- register yourself as a user.
+        /register [name] -- change your name.
         /answer n text -- send answer to nth question in your exam ticket. Text can be multi-line.
         /lookup_question n -- lookup your nth question.
         /lookup_answer n -- lookup your answer to nth question.
@@ -453,21 +460,11 @@ class Handler
     end
   end
 
-  private def check_user(dbuser)
-    return -1 if (dbuser.nil?)
-    0
-  end
-
-  private def check_priv_user(dbuser)
-    return -1 if (dbuser.privlevel != 0)
-    0
-  end
-
   private def get_command(api, tguser)
-    dbuser = User.new(@dbl, tguser)
-    return Command.new(api, tguser, @dbl) if (check_user(dbuser) == -1)
-    return NonPriviledgedCommand.new(api, tguser, @dbl) if (check_priv_user(dbuser) == -1)
-    PriviledgedCommand.new(api, tguser, @dbl)
+    dbuser = User.new(@dbl, tguser.id)
+    return Command.new(api, tguser, @dbl) if not dbuser.is_valid
+    return PriviledgedCommand.new(api, tguser, @dbl) if dbuser.privlevel == USER_STATE[:priviledged]
+    NonPriviledgedCommand.new(api, tguser, @dbl)
   end
 
   # returns true if we need to exit

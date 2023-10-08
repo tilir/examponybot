@@ -27,11 +27,20 @@ chat = PseudoChat.new(1)
 event = PseudoMessage.new(prepod, chat, "/register")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(prepod, chat, "/addexam")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(prepod, chat, "/stopexam")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 q11 = '/addquestion 1 1 наберите три любых слова в столбик'
 q12 = '/addquestion 1 2 наберите три любых слова в строку'
@@ -64,67 +73,130 @@ QST
 event = PseudoMessage.new(prepod, chat, q11)
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(prepod, chat, q12)
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(prepod, chat, q13)
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(prepod, chat, q21)
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(prepod, chat, q22)
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(prepod, chat, q23)
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(prepod, chat, q31)
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(prepod, chat, q32)
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(prepod, chat, q33)
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 # expect not enough rights
 event = PseudoMessage.new(student1, chat, "/questions")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 # expect ok
 event = PseudoMessage.new(prepod, chat, "/questions")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student1, chat, "/register")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student2, chat, "/register")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student3, chat, "/register")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(prepod, chat, "/users")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(prepod, chat, "/startexam")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student1, chat, "/answer 1 singleline from student1")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student2, chat, "/answer 1 singleline from student2")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student3, chat, "/answer 1 singleline from student3")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student3, chat, "/lookup_answer 1")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student3, chat, "/lookup_answer 2")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 a21 = <<~ANS
   /answer 2
@@ -148,107 +220,215 @@ ANS
 event = PseudoMessage.new(student1, chat, a21)
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student2, chat, a22)
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student3, chat, a23)
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student3, chat, "/lookup_answer 2")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student3, chat, "/lookup_answer")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student3, chat, "/lookup_question 1")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student3, chat, "/lookup_question")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student1, chat, "/answer 3 singleline from student1")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student2, chat, "/answer 3 singleline from student2")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student3, chat, "/answer 3 singleline from student3")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(prepod, chat, "/startreview")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student1, chat, "/review 10 2 don't like it")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student1, chat, "/review 11 2 don't like it")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student1, chat, "/review 12 2 don't like it")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student1, chat, "/review 12 4 like it better")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student1, chat, "/review 13 2 don't like it")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student1, chat, "/review 14 2 don't like it")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student1, chat, "/review 15 2 don't like it")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student1, chat, "/review 112 2 don't like it")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student1, chat, "/review 12 -1 don't like it")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student1, chat, "/review 12 100 don't like it")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student1, chat, "/review")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student1, chat, "/review 9.5")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student1, chat, "/lookup_review 10")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student1, chat, "/lookup_review 112")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student2, chat, "/review 1 10 like it")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student2, chat, "/review 2 10 like it")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student2, chat, "/review 3 10 like it")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student2, chat, "/review 16 10 like it")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student2, chat, "/review 17 10 like it")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student2, chat, "/review 18 10 like it")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student3, chat, "/review 4 10 like it")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(student3, chat, "/review 5 10 like it")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(student3, chat, "/review 6 10 like it")
 handler.process_message(api, event)
+
+puts"\n\n"
+
 
 event = PseudoMessage.new(prepod, chat, "/setgrades")
 handler.process_message(api, event)
 
+puts"\n\n"
+
+
 event = PseudoMessage.new(prepod, chat, "/stopexam")
 handler.process_message(api, event)
+
+puts"\n\n"
+
