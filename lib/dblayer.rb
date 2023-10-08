@@ -65,14 +65,6 @@ class DBLayer
     exit(1)
   end
 
-  def get_priviledge_for(id)
-    user = get_user_by_id(id)
-    return USER_STATE[:nonexsitent] if user.nil?
-    return USER_STATE[:priviledged] if user.privlevel == 0
-
-    USER_STATE[:regular]
-  end
-
   def users_empty?
     rs = @db.execute('SELECT * FROM users')
     Logger.print "user table empty" if rs.empty?
@@ -202,17 +194,6 @@ class DBLayer
     return nil if rs.nil?
 
     [rs[0], rs[1], rs[2]]
-  rescue SQLite3::Exception => e
-    puts "#{__FILE__}:#{__LINE__}:#{e}"
-    close
-    exit(1)
-  end
-
-  #exam.state
-  # this can support multiple exams in the future
-  def read_exam_state
-    rs = @db.get_first_row('SELECT * FROM exams')
-    rs[1]
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
