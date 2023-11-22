@@ -13,10 +13,10 @@ require 'sqlite3'
 require_relative './dbstructure'
 
 class Logger
-  def self.set_verbose verbose
+  def self.set_verbose(verbose)
     @@verbose = verbose
   end
-  def self.print message
+  def self.print(message)
     @@verbose ||= false
     p message if @@verbose
   end

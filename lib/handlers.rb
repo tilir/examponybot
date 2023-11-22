@@ -439,7 +439,7 @@ class Handler
         @api.send_message(chat_id: @tguser.id, text: "#{urid} is not your review assignment")
         return
       end
-      review = Review(@dbl, urid)
+      review = Review.new(@dbl, urid)
       if review.nil?
         @api.send_message(chat_id: @tguser.id, text: "#{urid} review not found")
         return

@@ -112,12 +112,38 @@ class User
     @name = name
   end
   
-  def nth_question(examid, n) = @dbl.user_nth_question(examid, @userid, n)
-  def n_reviews = @dbl.nreviews @userid
-  def all_answers = @dbl.user_all_answers @id
-  def to_userquestion(revid) = @dbl.urid_to_uqid(@userid, revid)
-  def is_priviledged = (@privlevel == 0) ? true : false
-  def is_valid = (@id.nil?) ? false : true
+  def nth_question(examid, n) 
+    @dbl.user_nth_question(examid, @userid, n)
+  end
+
+  def n_reviews 
+    @dbl.nreviews(@userid)
+  end
+
+  def all_answers 
+    @dbl.user_all_answers(@id)
+  end
+
+  def to_userquestion(revid) 
+    @dbl.urid_to_uqid(@userid, revid)
+  end
+
+  def is_priviledged 
+    (@privlevel == 0) ? true : false
+  end
+
+  def is_valid 
+    (@id.nil?) ? false : true
+  end
+
+  private def to_s
+    <<-USER
+      User: #{@id}
+      \tUserId: #{@userid}
+      \tUserName: #{@username}
+      \tPrivLevel: #{@privlevel}
+    USER
+  end
 end
 
 class Question
@@ -145,6 +171,15 @@ class Question
     end    
     raise DBLayerError.new "tried to get unregistered question"
   end
+
+  private def to_s
+    <<-QUESTION
+      Question: #{@id}
+      \tNumber: #{@number}
+      \tVariant: #{@variant}
+      \ttext: #{@text}
+    QUESTION
+  end
 end
 
 class Exam
@@ -170,6 +205,14 @@ class Exam
     @dbl.set_exam_state(@name, state)
     @state = state
   end
+
+  private def to_s
+    <<-EXAM
+      Exam: #{@id}
+      \tName: #{@name}
+      \tState: #{@state}
+    EXAM
+  end
 end
 
 class UserQuestion 
@@ -185,15 +228,26 @@ class UserQuestion
     @userid = userid
     @questionid = questionid
   end
+
   def to_answer 
-    answer = @dbl.uqid_to_answer @id
+    answer = @dbl.uqid_to_answer(@id)
     return nil if answer.nil?
     Answer.new(@dbl, @id)
   end
+
   def to_question
-    question = @dbl.uqid_to_question @id
+    question = @dbl.uqid_to_question(@id)
     return nil if question.nil?
     Question.new(@dbl, question[1], question[2])
+  end
+
+  private def to_s
+    <<-USERQUESTION
+      User question: #{@id}
+      \tExamId: #{@examid}
+      \tUserId: #{@userid}
+      \tQuestionId: #{questionid}
+    USERQUESTION
   end
 end
 
@@ -221,12 +275,25 @@ class Answer
   end
 
   def to_question
-    userquestion = @dbl.awid_to_userquestion @id
+    userquestion = @dbl.awid_to_userquestion(@id)
     userquestion.to_question
   end
 
-  def all_reviews = @dbl.allreviews @uqid
-  def is_valid = (@id.nil?) ? false : true
+  def all_reviews
+    @dbl.allreviews(@uqid)
+  end
+
+  def is_valid
+    (@id.nil?) ? false : true
+  end
+
+  private def to_s
+    <<-ANSWER
+      Answer: #{@id}
+      \tUserQuestionId: #{@uqid}
+      \tText: #{@text}
+    ANSWER
+  end
 end
 
 class UserReview 
@@ -239,6 +306,14 @@ class UserReview
     @id = dbl.create_review_assignment(userid, userquestionid)
     @userid = userid
     @userquestionid = userquestionid
+  end
+
+  private def to_s
+    <<-USERREVIEW
+      User review: #{@id}
+      \tUserId: #{@userid}
+      \tUserQuestionId: #{@userquestionid}
+    USERREVIEW
   end
 end
 
@@ -265,5 +340,14 @@ class Review
       return
     end
     raise DBLayerError.new "unregistered review"
+  end
+
+  private def to_s
+    <<-REVIEW
+      User review: #{@id}
+      \tReviewId: #{@revid}
+      \tGrade: #{@grade}
+      \tText: #{text}
+    REVIEW
   end
 end
