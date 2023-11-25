@@ -16,10 +16,10 @@ N_REVIEWERS = 3
 class Handler
   def initialize(dbname)
     @dbl = DBLayer.new(dbname)
-    if block_given?
-      yield self
-      shutdown
-    end
+    return unless block_given?
+
+    yield self
+    shutdown
   end
 
   class Command
@@ -32,8 +32,8 @@ class Handler
 
     def try_call(meth, *args)
       res = nil
-      if (self.respond_to?(meth.to_sym))
-        res = self.send(meth.to_sym, *args)
+      if respond_to?(meth.to_sym)
+        res = send(meth.to_sym, *args)
       else
         helptext = print_help
         txt = <<~TXT
@@ -43,12 +43,12 @@ class Handler
         TXT
         @api.send_message(chat_id: @tguser.id, text: txt)
       end
-      (res && meth == "exit") ? true : false
+      res && meth == 'exit' ? true : false
     end
 
-    def register name = ""
-      name = "#{@tguser.username}" if name.nil? or name == ""
-      name = "#{@tguser.id}" if name.nil? or name == ""
+    def register(name = '')
+      name = "#{@tguser.username}" if name.nil? or name == ''
+      name = "#{@tguser.id}" if name.nil? or name == ''
       Logger.print "register_user: #{name}"
 
       # first user added with pedagogical priviledges
@@ -58,14 +58,14 @@ class Handler
         return
       end
 
-      if (not @dbl.exams_empty? and Exam.new(@dbl, "exam").state != EXAM_STATE[:stopped])
-        @api.send_message(chat_id: @tguser.id, text: "Exam currently not in stopped mode")
+      if !@dbl.exams_empty? and Exam.new(@dbl, 'exam').state != EXAM_STATE[:stopped]
+        @api.send_message(chat_id: @tguser.id, text: 'Exam currently not in stopped mode')
         return
       end
 
       # subsequent users added with student privileges
       User.new(@dbl, @tguser.id, USER_STATE[:regular], name)
-      #TODO: conditional message
+      # TODO: conditional message
       @api.send_message(chat_id: @tguser.id, text: "Registered/updated as #{name}")
     end
 
@@ -75,22 +75,21 @@ class Handler
     end
 
     private def print_help
-      t = <<~HELP
+      <<~HELP
         /register [name] -- register yourself as a user.
       HELP
-      t
     end
   end
 
   class PriviledgedCommand < Command
-    #utils
+    # utils
     private def qualify_users(api, tguser, userreq)
       allu = @dbl.all_answered_users
       if allu.nil?
-        api.send_message(chat_id: tguser.id, text: "No answered users yet")
+        api.send_message(chat_id: tguser.id, text: 'No answered users yet')
         return []
       end
-  
+
       qualified = []
       allu.each do |user|
         userrevs = user.n_reviews
@@ -107,19 +106,19 @@ class Handler
       end
       qualified
     end
-  
+
     private def grade_answer(allrevs)
-      grade = 0;
+      grade = 0
       allrevs.each do |rev|
         grade += rev.grade
       end
       (grade.to_f / allrevs.length).round
     end
-  
-    private def send_reviewing_task(api, tguser, student, reviewer)
+
+    private def send_reviewing_task(api, _tguser, student, reviewer)
       answs = student.all_answers
       p "got #{answs.length} answers to review from #{student.userid}"
-  
+
       answs.each do |ans|
         review = UserReview.new(@dbl, reviewer.id, ans.uqid)
         qst = ans.to_question
@@ -134,17 +133,17 @@ class Handler
       end
     end
 
-    #iterface
+    # iterface
     def users
       allu = @dbl.all_users
-      @api.send_message(chat_id: @tguser.id, text: "--- all users ---")
+      @api.send_message(chat_id: @tguser.id, text: '--- all users ---')
       allu.each do |usr|
         @api.send_message(chat_id: @tguser.id, text: "#{usr.userid} #{usr.username} #{usr.privlevel}")
       end
-      @api.send_message(chat_id: @tguser.id, text: "---")
+      @api.send_message(chat_id: @tguser.id, text: '---')
     end
 
-    def addquestion rest = ""
+    def addquestion(rest = '')
       Logger.print "add_question: #{rest}"
       re = /(\d+)\s+(\d+)\s+(.+)/m
       m = rest.match(re).to_a
@@ -154,37 +153,37 @@ class Handler
 
       Logger.print "add_question: #{n} #{v} #{t}"
       Question.new(@dbl, n, v, t)
-      @api.send_message(chat_id: @tguser.id, text: "question added or updated")
+      @api.send_message(chat_id: @tguser.id, text: 'question added or updated')
     end
 
     def questions
       allq = @dbl.all_questions
-      @api.send_message(chat_id: @tguser.id, text: "--- all questions ---")
+      @api.send_message(chat_id: @tguser.id, text: '--- all questions ---')
       allq.each do |qst|
         @api.send_message(chat_id: @tguser.id, text: "#{qst.number} #{qst.variant} #{qst.text}")
       end
-      @api.send_message(chat_id: @tguser.id, text: "---")
+      @api.send_message(chat_id: @tguser.id, text: '---')
 
       nn = @dbl.n_questions
       nv = @dbl.n_variants
-      if (nn * nv != allq.length)
-        @api.send_message(chat_id: @tguser.id, text: "Warning: #{nn} * #{nv} != #{allq.length}")
-      end
+      return unless nn * nv != allq.length
+
+      @api.send_message(chat_id: @tguser.id, text: "Warning: #{nn} * #{nv} != #{allq.length}")
     end
 
     def addexam
       if @dbl.exams_empty?
-        Exam.new(@dbl, "exam")
-        @api.send_message(chat_id: @tguser.id, text: "Exam added")
+        Exam.new(@dbl, 'exam')
+        @api.send_message(chat_id: @tguser.id, text: 'Exam added')
       else
-        @api.send_message(chat_id: @tguser.id, text: "Exam already exists, currently only one exam possible")
+        @api.send_message(chat_id: @tguser.id, text: 'Exam already exists, currently only one exam possible')
       end
     end
 
     def startexam
-      exam = Exam.new(@dbl, "exam")
-      if (exam.state != EXAM_STATE[:stopped])
-        @api.send_message(chat_id: @tguser.id, text: "Exam currently not in stopped mode")
+      exam = Exam.new(@dbl, 'exam')
+      if exam.state != EXAM_STATE[:stopped]
+        @api.send_message(chat_id: @tguser.id, text: 'Exam currently not in stopped mode')
         return
       end
       exam.set_state(EXAM_STATE[:answering])
@@ -205,20 +204,20 @@ class Handler
     end
 
     def stopexam
-      Exam.new(@dbl, "exam").set_state(EXAM_STATE[:stopped])
+      Exam.new(@dbl, 'exam').set_state(EXAM_STATE[:stopped])
     end
 
     def startreview
-      exam = Exam.new(@dbl, "exam")
-      if (exam.state != EXAM_STATE[:answering])
-        @api.send_message(chat_id: @tguser.id, text: "Exam currently not in answering mode")
+      exam = Exam.new(@dbl, 'exam')
+      if exam.state != EXAM_STATE[:answering]
+        @api.send_message(chat_id: @tguser.id, text: 'Exam currently not in answering mode')
         return
       end
       exam.set_state(EXAM_STATE[:reviewing])
 
       allu = @dbl.all_answered_users
       if allu.nil?
-        @api.send_message(chat_id: @tguser.id, text: "No answered users yet")
+        @api.send_message(chat_id: @tguser.id, text: 'No answered users yet')
         return
       end
 
@@ -239,9 +238,9 @@ class Handler
     end
 
     def setgrades
-      exam = Exam.new(@dbl, "exam")
-      if (exam.state != EXAM_STATE[:reviewing])
-        @api.send_message(chat_id: @tguser.id, text: "Exam currently not in reviewing mode")
+      exam = Exam.new(@dbl, 'exam')
+      if exam.state != EXAM_STATE[:reviewing]
+        @api.send_message(chat_id: @tguser.id, text: 'Exam currently not in reviewing mode')
         return
       end
       exam.set_state(EXAM_STATE[:grading])
@@ -294,7 +293,7 @@ class Handler
     end
 
     private def print_help
-      t = <<~HELP
+      <<~HELP
         /addquestion n v text
         /questions
         /users
@@ -306,24 +305,24 @@ class Handler
         /reload
         /exit
       HELP
-      t
     end
   end
 
   class NonPriviledgedCommand < Command
-    private def check_question_number n
+    private def check_question_number(n)
       nn = @dbl.n_questions
       if (n > nn) or (n < 1)
-        @api.send_message(chat_id: @tguser.id, text: "Question have incorrect number #{n}. Allowed range: [1 .. #{nn}].")
+        @api.send_message(chat_id: @tguser.id,
+                          text: "Question have incorrect number #{n}. Allowed range: [1 .. #{nn}].")
         return false
       end
       true
     end
 
-    def answer rest = ""
-      exam = Exam.new(@dbl, "exam")
-      if (exam.state != EXAM_STATE[:answering])
-        @api.send_message(chat_id: @tguser.id, text: "Exam not accepting answers now")
+    def answer(rest = '')
+      exam = Exam.new(@dbl, 'exam')
+      if exam.state != EXAM_STATE[:answering]
+        @api.send_message(chat_id: @tguser.id, text: 'Exam not accepting answers now')
         return
       end
 
@@ -334,22 +333,28 @@ class Handler
 
       Logger.print "Answer from #{@tguser.username} to #{n} is: #{t}"
 
-      return unless check_question_number n
+      return unless check_question_number(n)
 
       dbuser = User.new(@dbl, @tguser.id)
       uqst = dbuser.nth_question(exam.id, n)
+
+      if uqst.nil?
+        @api.send_message(chat_id: @tguser.id, text: "You don't have this question yet.")
+        return
+      end
+      
       Answer.new(@dbl, uqst.id, t)
       @api.send_message(chat_id: @tguser.id, text: "Answer recorded to #{uqst.id}")
     end
 
-    def lookup_question rest = ""
+    def lookup_question(rest = '')
       re = /(\d+)/m
       m = rest.match(re).to_a
       n = m[1].to_i
 
-      return unless check_question_number n
+      return unless check_question_number(n)
 
-      exam = Exam.new(@dbl, "exam")
+      exam = Exam.new(@dbl, 'exam')
       dbuser = User.new(@dbl, @tguser.id)
       uqst = dbuser.nth_question(exam.id, n)
 
@@ -368,14 +373,14 @@ class Handler
       @api.send_message(chat_id: @tguser.id, text: qst.text)
     end
 
-    def lookup_answer rest = ""
+    def lookup_answer(rest = '')
       re = /(\d+)/m
       m = rest.match(re).to_a
       n = m[1].to_i
 
       return unless check_question_number n
 
-      exam = Exam.new(@dbl, "exam")
+      exam = Exam.new(@dbl, 'exam')
       dbuser = User.new(@dbl, @tguser.id)
       uqst = dbuser.nth_question(exam.id, n)
 
@@ -386,7 +391,7 @@ class Handler
 
       answ = uqst.to_answer
 
-      if (answ.nil?)
+      if answ.nil?
         @api.send_message(chat_id: @tguser.id, text: "You haven't answered yet.")
         return
       end
@@ -394,10 +399,10 @@ class Handler
       @api.send_message(chat_id: @tguser.id, text: answ.text)
     end
 
-    def review rest = ""
-      exam = Exam.new(@dbl, "exam")
-      if (exam.state != EXAM_STATE[:reviewing])
-        @api.send_message(chat_id: @tguser.id, text: "Exam not accepting reviews now")
+    def review(rest = '')
+      exam = Exam.new(@dbl, 'exam')
+      if exam.state != EXAM_STATE[:reviewing]
+        @api.send_message(chat_id: @tguser.id, text: 'Exam not accepting reviews now')
         return
       end
 
@@ -408,7 +413,7 @@ class Handler
       t = m[3]
 
       if g < 1 or g > 10
-        @api.send_message(chat_id: @tguser.id, text: "Grade shall be 1 .. 10")
+        @api.send_message(chat_id: @tguser.id, text: 'Grade shall be 1 .. 10')
         return
       end
 
@@ -428,7 +433,7 @@ class Handler
       @api.send_message(chat_id: @tguser.id, text: "You sent #{userrevs} out of #{userreq} required reviews")
     end
 
-    def lookup_review rest = ""
+    def lookup_review(rest = '')
       re = /(\d+)/m
       m = rest.match(re).to_a
       urid = m[1].to_i
@@ -448,7 +453,7 @@ class Handler
     end
 
     private def print_help
-      t = <<~HELP
+      <<~HELP
         /register [name] -- change your name.
         /answer n text -- send answer to nth question in your exam ticket. Text can be multi-line.
         /lookup_question n -- lookup your nth question.
@@ -456,14 +461,14 @@ class Handler
         /review r grade text -- send review assignment r, set grade (from 1 to 10), send explanation.
         /lookup_review r -- lookup your review assignment in r's review.
       HELP
-      t
     end
   end
 
   private def get_command(api, tguser)
     dbuser = User.new(@dbl, tguser.id)
-    return Command.new(api, tguser, @dbl) if not dbuser.is_valid
+    return Command.new(api, tguser, @dbl) if dbuser.privlevel == USER_STATE[:nonexistent]
     return PriviledgedCommand.new(api, tguser, @dbl) if dbuser.privlevel == USER_STATE[:priviledged]
+
     NonPriviledgedCommand.new(api, tguser, @dbl)
   end
 
@@ -471,7 +476,7 @@ class Handler
   def process_message(api, message)
     Logger.print "process_message: #{message.text}"
     return false if message.text.nil?
-    return false if not message.text.start_with?('/')
+    return false unless message.text.start_with?('/')
 
     re = /(\w+)\s*(.*)/m
     matches = message.text.match(re).to_a

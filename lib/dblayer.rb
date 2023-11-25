@@ -16,6 +16,7 @@ class Logger
   def self.set_verbose(verbose)
     @@verbose = verbose
   end
+
   def self.print(message)
     @@verbose ||= false
     p message if @@verbose
@@ -24,6 +25,7 @@ end
 
 class DBLayer
   attr_reader :name
+
   def initialize(dbname)
     @db = SQLite3::Database.new(dbname)
     @name = dbname
@@ -35,19 +37,16 @@ class DBLayer
   end
 
   def add_user(tguser, priv, name)
-    @db.execute('INSERT INTO users (userid, username, privlevel) VALUES (?, ?, ?)', [tguser, name, priv])
-    Logger.print "user #{name} added with priv level #{priv}"
+    rs = @db.get_first_row('SELECT * FROM users WHERE userid = ?', [tguser])
+    if rs.nil?
+      @db.execute('INSERT INTO users (userid, username, privlevel) VALUES (?, ?, ?)', [tguser, name, priv])
+      Logger.print "user #{name} added with priv level #{priv}"
+    else 
+      @db.execute('UPDATE users SET username = ? WHERE userid = ?', [name, tguser])
+      Logger.print "user #{name} updated with priv level #{priv}"
+    end
     rs = @db.get_first_row('SELECT * FROM users WHERE userid = ?', [tguser])
     rs[0]
-  rescue SQLite3::Exception => e
-    puts "#{__FILE__}:#{__LINE__}:#{e}"
-    close
-    exit(1)
-  end
-
-  def update_user(tguser, priv, name)
-    @db.execute('UPDATE users SET username = ? WHERE userid = ?', [name, tguser])
-    Logger.print "user #{name} updated with priv level #{priv}"
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
@@ -67,7 +66,7 @@ class DBLayer
 
   def users_empty?
     rs = @db.execute('SELECT * FROM users')
-    Logger.print "user table empty" if rs.empty?
+    Logger.print 'user table empty' if rs.empty?
     rs.empty?
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
@@ -108,11 +107,11 @@ class DBLayer
 
   def add_question(number, variant, question)
     rs = @db.get_first_row('SELECT * FROM questions WHERE number = ? AND variant = ?', [number, variant])
-    if (rs.nil?)
+    if rs.nil?
       @db.execute('INSERT INTO questions (number, variant, question) VALUES (?, ?, ?)', [number, variant, question])
       Logger.print "question #{number} #{variant} #{question} added"
     else
-      @db.execute('UPDATE questions SET question = ? WHERE number = ? AND variant = ?', [number, variant, question])
+      @db.execute('UPDATE questions SET question = ? WHERE number = ? AND variant = ?', [question, number, variant])
       Logger.print "question #{number} #{variant} #{question} updated"
     end
     rs = @db.get_first_row('SELECT * FROM questions WHERE number = ? AND variant = ?', [number, variant])
@@ -175,24 +174,18 @@ class DBLayer
   end
 
   def add_exam(name)
-    if exams_empty?
-      @db.execute('INSERT INTO exams (state, name) VALUES (?, ?)', [0, name])
-      Logger.print "exam added"
+    rs = @db.get_first_row('SELECT * FROM exams WHERE name = ?', [name])
+    if rs.nil?
+      if exams_empty?
+        @db.execute('INSERT INTO exams (state, name) VALUES (?, ?)', [0, name])
+        Logger.print 'exam added'
+        rs = @db.get_first_row('SELECT * FROM exams WHERE name = ?', [name])
+      else
+        Logger.print 'sorry only one exam supported'
+      end
     else
-      Logger.print "sorry only one exam supported"
+      Logger.print "exam #{name} already exists"
     end
-    rs = @db.get_first_row('SELECT * FROM exams WHERE name = ?', [name])
-    rs[0]
-  rescue SQLite3::Exception => e
-    puts "#{__FILE__}:#{__LINE__}:#{e}"
-    close
-    exit(1)
-  end
-
-  def get_exam(name)
-    rs = @db.get_first_row('SELECT * FROM exams WHERE name = ?', [name])
-    return nil if rs.nil?
-
     [rs[0], rs[1], rs[2]]
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
@@ -211,14 +204,15 @@ class DBLayer
 
   def register_question(eid, uid, qid)
     rs = @db.get_first_row('SELECT * FROM userquestions WHERE exam = ? AND user = ? AND question = ?', [eid, uid, qid])
-    if (rs.nil?)
+    if rs.nil?
       @db.execute('INSERT INTO userquestions (exam, user, question) VALUES (?, ?, ?)', [eid, uid, qid])
       Logger.print "question #{qid} linked with user #{uid}"
-      rs = @db.get_first_row('SELECT * FROM userquestions WHERE exam = ? AND user = ? AND question = ?', [eid, uid, qid])
+      rs = @db.get_first_row('SELECT * FROM userquestions WHERE exam = ? AND user = ? AND question = ?',
+                             [eid, uid, qid])
     else
       Logger.print "question #{qid} link with user #{uid} already exists"
     end
-    return rs[0]
+    rs[0]
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
@@ -249,7 +243,7 @@ class DBLayer
       Logger.print row
       next if row[1].nil? or row[2].nil?
 
-      answers.append Answer.new(self, row[1])
+      answers.append(Answer.new(self, row[1]))
     end
     answers
   end
@@ -286,7 +280,7 @@ class DBLayer
 
   def record_answer(uqid, t)
     rs = @db.get_first_row('SELECT * FROM answers WHERE uqid = ?', [uqid])
-    if (rs.nil?)
+    if rs.nil?
       @db.execute('INSERT INTO answers (uqid, answer) VALUES (?, ?)', [uqid, t])
       Logger.print "answer #{t} recorded for #{uqid}"
       rs = @db.get_first_row('SELECT * FROM answers WHERE uqid = ?', [uqid])
@@ -337,7 +331,7 @@ class DBLayer
     multiline = <<-SQL
       SELECT DISTINCT * FROM questions
       INNER JOIN userquestions ON questions.id = userquestions.question
-      WHERE userquestions.id = ?      
+      WHERE userquestions.id = ?#{'      '}
     SQL
     rs = @db.get_first_row(multiline, [uqid])
     return nil if rs.nil?
@@ -362,7 +356,7 @@ class DBLayer
 
   def create_review_assignment(rid, uqid)
     rs = @db.get_first_row('SELECT * FROM userreviews WHERE reviewer = ? AND uqid = ?', [rid, uqid])
-    if (rs.nil?)
+    if rs.nil?
       @db.execute('INSERT INTO userreviews (reviewer, uqid) VALUES (?, ?)', [rid, uqid])
       Logger.print "uqid #{uqid} linked with reviewer #{rid}"
       rs = @db.get_first_row('SELECT * FROM userreviews WHERE reviewer = ? AND uqid = ?', [rid, uqid])
@@ -374,12 +368,12 @@ class DBLayer
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
     exit(1)
-  end    
+  end
 
   # userreview.userquestionid
   def urid_to_uqid(uid, rid)
     rs = @db.get_first_row('SELECT uqid FROM userreviews WHERE reviewer = ? AND id = ?', [uid, rid])
-    return rs if (rs.nil?)
+    return rs if rs.nil?
 
     rs[0]
   rescue SQLite3::Exception => e
@@ -390,14 +384,14 @@ class DBLayer
 
   def record_review(revid, grade, review)
     rs = @db.get_first_row('SELECT * FROM reviews WHERE revid = ?', [revid])
-    if (rs.nil?)
+    if rs.nil?
       @db.execute('INSERT INTO reviews (revid, grade, review) VALUES (?, ?, ?)', [revid, grade, review])
       Logger.print "review #{grade} #{review} created for #{revid} assignment"
-      rs = @db.get_first_row('SELECT * FROM reviews WHERE revid = ?', [revid])
     else
       @db.execute('UPDATE reviews SET grade = ?, review = ? WHERE revid = ?', [grade, review, revid])
       Logger.print "review #{grade} #{review} updated for #{revid} assignment"
     end
+    rs = @db.get_first_row('SELECT * FROM reviews WHERE revid = ?', [revid])
     rs[0]
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
@@ -407,7 +401,7 @@ class DBLayer
 
   def query_review(revid)
     rs = @db.get_first_row('SELECT * FROM reviews WHERE revid = ?', [revid])
-    return rs if (rs.nil?)
+    return rs if rs.nil?
 
     [rs[0], rs[1], rs[2], rs[3]]
   rescue SQLite3::Exception => e
