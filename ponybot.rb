@@ -18,49 +18,52 @@ require_relative './lib/handlers'
 
 def parse_options
   options = {}
-  options[:dbname] = "exam.db"
+  options[:dbname] = 'exam.db'
 
   OptionParser.new do |opts|
-    opts.banner = "Usage: ./ponybot.rb [options]"
+    opts.banner = 'Usage: ./ponybot.rb [options]'
 
-    opts.on("-t", "--token TOKEN", "Your bot token (mandatory)") do |v|
+    opts.on('-t', '--token TOKEN', 'Your bot token (mandatory)') do |v|
       options[:token] = v
     end
 
-    opts.on("-b", "--database NAME", "Database name. Default: #{options[:dbname]}.") do |v|
+    opts.on('-b', '--database NAME', "Database name. Default: #{options[:dbname]}.") do |v|
       options[:dbname] = v
     end
 
-    opts.on("-v", "--[no-]verbose", "Run verbosely. No default value.") do |v|
+    opts.on('-v', '--[no-]verbose', 'Run verbosely. No default value.') do |v|
       options[:verbose] = v
     end
 
-    opts.on("-h", "--help", "Prints this help.") do
+    opts.on('-h', '--help', 'Prints this help.') do
       puts opts
       exit
     end
   end.parse!
 
   p options if options[:verbose]
-  raise "You need to specify token" if options[:token].nil?
+  raise 'You need to specify token' if options[:token].nil?
 
   options
 end
 
 def main
   options = parse_options
-  handler = Handler.new(options[:dbname], options[:verbose])
-  finish = false
-  first = true
-  Telegram::Bot::Client.run(options[:token]) do |bot|
-    bot.listen do |event|
-      finish = handler.process_message(bot.api, event) if event.class == Telegram::Bot::Types::Message
-      break if finish and not first
+  Logger.set_verbose options[:verbose]
+  Handler.new(options[:dbname]) do |handler|
+    finish = false
+    first = true
+    Telegram::Bot::Client.run(options[:token]) do |bot|
+      bot.listen do |event|
+        finish = handler.process_message(bot.api, event) if event.class == Telegram::Bot::Types::Message
+        break if finish and !first
 
-      first = false
+        first = false
+      end
     end
   end
-  handler.shutdown
+rescue DBLayerError => e
+  puts "[[DBLayerError]] #{e}"
 end
 
 # main program start
