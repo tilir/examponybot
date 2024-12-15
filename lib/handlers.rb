@@ -58,15 +58,29 @@ class Handler
         return
       end
 
-      if !@dbl.exams_empty? and Exam.new(@dbl, 'exam').state != EXAM_STATE[:stopped]
-        @api.send_message(chat_id: @tguser.id, text: 'Exam currently not in stopped mode')
-        return
-      end
+      allu = @dbl.all_nonpriv_users
+      found = allu.find{ |usr| usr.userid == @tguser.id }
 
       # subsequent users added with student privileges
-      User.new(@dbl, @tguser.id, USER_STATE[:regular], name)
-      # TODO: conditional message
+      dbuser = User.new(@dbl, @tguser.id, USER_STATE[:regular], name)
       @api.send_message(chat_id: @tguser.id, text: "Registered/updated as #{name}")
+ 
+      # new reg with running exam getting its questions
+      if !@dbl.exams_empty?
+        exam = Exam.new(@dbl, 'exam')
+        if found.nil? and exam.state != EXAM_STATE[:stopped]
+          nn = @dbl.n_questions
+          nv = @dbl.n_variants
+          prng = Random.new
+
+          (1..nn).each do |n|
+            v = prng.rand(1..nv)
+            q = Question.new(@dbl, n, v)
+            UserQuestion.new(@dbl, exam.id, dbuser.id, q.id)
+            @api.send_message(chat_id: dbuser.userid, text: "Question #{n}, variant #{v}: #{q.text}")
+          end
+        end
+      end
     end
 
     def help
