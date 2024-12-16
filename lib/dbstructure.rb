@@ -108,7 +108,7 @@ class User
   end
 
   def nth_question(examid, n)
-    @dbl.user_nth_question(examid, @userid, n)
+    @dbl.user_nth_question(examid, @id, n)
   end
 
   def n_reviews
