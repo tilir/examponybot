@@ -19,6 +19,7 @@ class Logger
 
   def self.print(message)
     @@verbose ||= false
+    # p message
     p message if @@verbose
   end
 end
