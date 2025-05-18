@@ -165,7 +165,7 @@ class Handler
       v = m[2]
       t = m[3]
 
-      Logger.print "add_question: #{n} #{v} #{t}"
+      Logger.print "add_question broken into: #{n} #{v} #{t}"
       Question.new(@dbl, n, v, t)
       @api.send_message(chat_id: @tguser.id, text: 'question added or updated')
     end
@@ -489,7 +489,11 @@ class Handler
   # returns true if we need to exit
   def process_message(api, message)
     Logger.print "process_message: #{message.text}"
+
+    Logger.print "nil message" if message.text.nil?
     return false if message.text.nil?
+
+    Logger.print "incorrect message" unless message.text.start_with?('/')
     return false unless message.text.start_with?('/')
 
     re = /(\w+)\s*(.*)/m
