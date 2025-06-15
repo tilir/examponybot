@@ -38,3 +38,5 @@ After grading is done, issue /stopexam and enable new registrations.
 ## How to contribute
 
 Without fear. Merge requests are welcome.
+
+Your MR need to pass github actions pipeline before review.
