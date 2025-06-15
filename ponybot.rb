@@ -12,6 +12,7 @@
 #
 #------------------------------------------------------------------------------
 
+require 'bundler/setup'
 require 'optparse'
 require 'telegram/bot'
 require_relative './lib/handlers'
