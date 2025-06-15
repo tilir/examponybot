@@ -17,7 +17,7 @@ EXAM_STATE = {
 }
 
 USER_STATE = {
-  priviledged: 0,
+  privileged: 0,
   regular: 1,
   nonexistent: 2
 }
@@ -123,7 +123,7 @@ class User
     @dbl.urid_to_uqid(@userid, revid)
   end
 
-  def is_priviledged
+  def is_privileged
     @privlevel == 0
   end
 

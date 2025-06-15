@@ -14,6 +14,8 @@ require_relative './dblayer'
 N_REVIEWERS = 3
 
 class Handler
+  attr_accessor :dbl # test purposes only
+
   def initialize(dbname)
     @dbl = DBLayer.new(dbname)
     return unless block_given?
@@ -53,8 +55,8 @@ class Handler
 
       # first user added with pedagogical priviledges
       if @dbl.users_empty?
-        User.new(@dbl, @tguser.id, USER_STATE[:priviledged], name)
-        @api.send_message(chat_id: @tguser.id, text: "Registered (priviledged) as #{name}")
+        User.new(@dbl, @tguser.id, USER_STATE[:privileged], name)
+        @api.send_message(chat_id: @tguser.id, text: "Registered (privileged) as #{name}")
         return
       end
 
@@ -95,7 +97,7 @@ class Handler
     end
   end
 
-  class PriviledgedCommand < Command
+  class PrivilegedCommand < Command
     # utils
     private def qualify_users(api, tguser, userreq)
       allu = @dbl.all_answered_users
@@ -320,7 +322,7 @@ class Handler
     end
   end
 
-  class NonPriviledgedCommand < Command
+  class NonPrivilegedCommand < Command
     private def check_question_number(n)
       nn = @dbl.n_questions
       if (n > nn) or (n < 1)
@@ -479,9 +481,9 @@ class Handler
   private def get_command(api, tguser)
     dbuser = User.new(@dbl, tguser.id)
     return Command.new(api, tguser, @dbl) if dbuser.privlevel == USER_STATE[:nonexistent]
-    return PriviledgedCommand.new(api, tguser, @dbl) if dbuser.privlevel == USER_STATE[:priviledged]
+    return PrivilegedCommand.new(api, tguser, @dbl) if dbuser.privlevel == USER_STATE[:privileged]
 
-    NonPriviledgedCommand.new(api, tguser, @dbl)
+    NonPrivilegedCommand.new(api, tguser, @dbl)
   end
 
   # returns true if we need to exit

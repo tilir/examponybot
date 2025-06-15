@@ -1,7 +1,7 @@
 require 'rake/testtask'
 
 test_files = [
-  'test/test_sample.rb',
+  'test/basic_smoke.rb',
 ]
 
 Rake::TestTask.new(:test) do |t|

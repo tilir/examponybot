@@ -16,7 +16,7 @@ class PseudoApi
   end
 end
 
-class PseudoUser
+class PseudoTGUser
   attr_accessor :id
   attr_accessor :username
   def initialize(id, username)
