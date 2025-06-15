@@ -23,5 +23,5 @@ jobs:
         run: bundle install --path vendor/bundle
 
       - name: Run tests
-        run: bundle exec ruby test/test_sample.rb
+        run: bundle exec rake test TESTOPTS="-v"
 
