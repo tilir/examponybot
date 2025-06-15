@@ -235,8 +235,6 @@ class Handler
         return
       end
 
-      nn = @dbl.n_questions
-
       astud = allu
       arev1 = allu.rotate(1)
       arev2 = allu.rotate(2)

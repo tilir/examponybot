@@ -5,13 +5,14 @@
 #
 #------------------------------------------------------------------------------
 #
-# Pseudo telegram API to test things
+# Pseudo telegram API for unit test purposes
 #
 #------------------------------------------------------------------------------
 
 class PseudoApi
+  attr_accessor :text
   def send_message(chat_id:, text:)
-    p "+++ send :: #{chat_id} : #{text}"
+    @text = "#{chat_id} : #{text}"
   end
 end
 
