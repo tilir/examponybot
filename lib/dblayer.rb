@@ -278,11 +278,11 @@ class DBLayer
   end
 
   def record_answer(uqid, t)
-    rs = @db.get_first_row('SELECT * FROM answers WHERE uqid = ?', [uqid])
+    rs = @db.get_first_row('SELECT id FROM answers WHERE uqid = ?', [uqid])
     if rs.nil?
       @db.execute('INSERT INTO answers (uqid, answer) VALUES (?, ?)', [uqid, t])
       Logger.print "answer #{t} recorded for #{uqid}"
-      rs = @db.get_first_row('SELECT * FROM answers WHERE uqid = ?', [uqid])
+      rs = @db.get_first_row('SELECT id FROM answers WHERE uqid = ?', [uqid])
     else
       @db.execute('UPDATE answers SET answer = ? WHERE id = ?', [t, rs[0]])
       Logger.print "answer #{t} updated for #{uqid}"
@@ -296,7 +296,7 @@ class DBLayer
 
   def uqid_to_answer(uqid)
     multiline = <<-SQL
-      SELECT * FROM answers
+      SELECT id, uqid, answer FROM answers
       INNER JOIN userquestions ON userquestions.id = answers.uqid
       WHERE userquestions.id = ?
     SQL

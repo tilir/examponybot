@@ -20,18 +20,14 @@ module ExamStates
   NAMES = STATES.invert.freeze
 
   def self.to_i(name)
-    STATES.fetch(name)
+    STATES.fetch(name) { raise ArgumentError, "Unknown exam state name: #{name.inspect}" }
   end
 
   def self.to_sym(code)
-    NAMES.fetch(code)
+    NAMES.fetch(code) { raise ArgumentError, "Unknown exam state code: #{code.inspect}" }
   end
 
-  def self.valid_name?(name)
-    STATES.key?(name)
-  end
-
-  def self.valid_code?(code)
-    NAMES.key?(code)
+  def self.valid?(val)
+    STATES.key?(val) || NAMES.key?(val)
   end
 end

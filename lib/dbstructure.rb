@@ -19,11 +19,12 @@ def create_db_structure(db)
   db.execute <<-SQL
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY,
-      userid INTEGER,
+      userid INTEGER UNIQUE,
       username TEXT,
       privlevel INTEGER
     );
   SQL
+
   db.execute <<-SQL
     CREATE TABLE IF NOT EXISTS questions (
       id INTEGER PRIMARY KEY,
@@ -32,47 +33,59 @@ def create_db_structure(db)
       question TEXT
     );
   SQL
+
   db.execute <<-SQL
     CREATE TABLE IF NOT EXISTS exams (
-      id INTEGER PRIMARY KEY,#{'      '}
+      id INTEGER PRIMARY KEY,
       state INTEGER,
       name TEXT
     );
   SQL
+
   db.execute <<-SQL
     CREATE TABLE IF NOT EXISTS userquestions (
       id INTEGER PRIMARY KEY,
-      exam INTEGER,
-      user INTEGER,
-      question INTEGER
+      exam INTEGER REFERENCES exams(id) ON DELETE CASCADE,
+      user INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      question INTEGER REFERENCES questions(id) ON DELETE CASCADE
     );
   SQL
+
   db.execute <<-SQL
     CREATE TABLE IF NOT EXISTS answers (
       id INTEGER PRIMARY KEY,
-      uqid INTEGER,
-      answer TEXT#{'      '}
+      uqid INTEGER REFERENCES userquestions(id) ON DELETE CASCADE,
+      answer TEXT
     );
   SQL
+
   db.execute <<-SQL
     CREATE TABLE IF NOT EXISTS userreviews (
       id INTEGER PRIMARY KEY,
-      reviewer INTEGER,
-      uqid INTEGER
+      reviewer INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      uqid INTEGER REFERENCES userquestions(id) ON DELETE CASCADE
     );
   SQL
+
   db.execute <<-SQL
     CREATE TABLE IF NOT EXISTS reviews (
       id INTEGER PRIMARY KEY,
-      revid INTEGER,
+      revid INTEGER REFERENCES userreviews(id) ON DELETE CASCADE,
       grade INTEGER,
-      review TEXT#{'      '}
+      review TEXT
     );
   SQL
 end
 
 class User
   attr_reader :id, :userid, :username, :privlevel
+
+  # generate methods like user.privileged? etc...
+  UserStates::STATES.keys.each do |state_name|
+    define_method "#{state_name}?" do
+      @privlevel == UserStates.to_i(state_name)
+    end
+  end
 
   def initialize(dbl, userid, privlevel = nil, username = nil)
     @dbl       = dbl
@@ -130,7 +143,7 @@ class User
     if record
       @id, @userid, @username, @privlevel = record
       unless UserStates.valid?(@privlevel)
-        raise "Invalid user state code: #{@privlevel.inspect}"
+        raise ArgumentError, "Invalid user state code: #{@privlevel.inspect}"
       end
       Logger.print "Loaded from base: #{@username} #{@privlevel}"
     else
@@ -145,34 +158,39 @@ class Question
 
   def initialize(dbl, number, variant, text = nil)
     @dbl = dbl
+    @number = number
+    @variant = variant
 
-    unless (text.nil?)
-      @id = dbl.add_question(number, variant, text)
-      @number = number
-      @variant = variant
-      @text = text
-      return
+    if text
+      create_question(text)
+    else
+      load_question_or_fail
     end
-
-    question = dbl.get_question(number, variant)
-    unless (question.nil?)
-      @id = question[0]
-      @number = question[1]
-      @variant = question[2]
-      @text = question[3]
-      return
-    end
-
-    raise DBLayerError, 'tried to get unregistered question'
   end
 
-  private def to_s
-    <<-QUESTION
-      Question: #{@id}
+  def to_s
+    <<~QUESTION.chomp
+      Question: #{id || '(not in DB)'}
       \tNumber: #{@number}
       \tVariant: #{@variant}
-      \ttext: #{@text}
+      \tText: #{@text || '(none)'}
     QUESTION
+  end
+
+  private
+
+  def create_question(text)
+    @id = @dbl.add_question(@number, @variant, text)
+    @text = text
+  end
+
+  def load_question_or_fail
+    record = @dbl.get_question(@number, @variant)
+    if record
+      @id, @number, @variant, @text = record
+    else
+      raise DBLayerError, "Tried to get unregistered question (#{@number}, #{@variant})"
+    end
   end
 end
 
@@ -191,17 +209,13 @@ class Exam
     ExamStates.to_sym(@raw_state)
   end
 
-  def state_code
-    @raw_state
-  end
-
   def set_state(state_sym)
     code = ExamStates.to_i(state_sym)
     @dbl.set_exam_state(@name, code)
     @raw_state = code
   end
 
-  private def to_s
+  def to_s
     <<~EXAM
       Exam: #{@id}
       \tName: #{@name}
@@ -232,15 +246,16 @@ class UserQuestion
     question = @dbl.uqid_to_question(@id)
     return nil if question.nil?
 
-    Question.new(@dbl, question[1], question[2])
+    # question is [id, number, variant, text], so we pass number, variant, text
+    Question.new(@dbl, question[1], question[2], question[3])
   end
 
-  private def to_s
-    <<-USERQUESTION
+  def to_s
+    <<~USERQUESTION.chomp
       User question: #{@id}
       \tExamId: #{@examid}
       \tUserId: #{@userid}
-      \tQuestionId: #{questionid}
+      \tQuestionId: #{@questionid}
     USERQUESTION
   end
 end
@@ -250,23 +265,13 @@ class Answer
 
   def initialize(dbl, uqid, text = nil)
     @dbl = dbl
-    
-    unless (text.nil?)
-      @id = dbl.record_answer(uqid, text)
-      @uqid = uqid
-      @text = text
-      return
-    end
+    @uqid = uqid
 
-    answer = dbl.uqid_to_answer(uqid)
-    unless (answer.nil?)
-      @id = answer[0]
-      @uqid = answer[1]
-      @text = answer[2]
-      return
+    if text
+      create_answer(text)
+    else
+      load_answer
     end
-
-    raise DBLayerError, 'tried to get unregistered answer'
   end
 
   def to_question
@@ -278,12 +283,28 @@ class Answer
     @dbl.allreviews(@uqid)
   end
 
-  private def to_s
-    <<-ANSWER
+  def to_s
+    <<~ANSWER.chomp
       Answer: #{@id}
       \tUserQuestionId: #{@uqid}
       \tText: #{@text}
     ANSWER
+  end
+
+  private
+
+  def create_answer(text)
+    @id = @dbl.record_answer(@uqid, text)
+    @text = text
+  end
+
+  def load_answer
+    answer = @dbl.uqid_to_answer(@uqid)
+    if answer
+      @id, @uqid, @text = answer
+    else
+      raise DBLayerError, 'tried to get unregistered answer'
+    end
   end
 end
 
@@ -292,13 +313,13 @@ class UserReview
 
   def initialize(dbl, userid, userquestionid)
     @dbl = dbl
-    @id = dbl.create_review_assignment(userid, userquestionid)
     @userid = userid
     @userquestionid = userquestionid
+    @id = dbl.create_review_assignment(userid, userquestionid)
   end
 
-  private def to_s
-    <<-USERREVIEW
+  def to_s
+    <<~USERREVIEW
       User review: #{@id}
       \tUserId: #{@userid}
       \tUserQuestionId: #{@userquestionid}
@@ -311,33 +332,26 @@ class Review
 
   def initialize(dbl, revid, grade = nil, text = nil)
     @dbl = dbl
+    @revid = revid
 
-    unless (grade.nil? or text.nil?)
-      @id = dbl.record_review(revid, grade, text)
-      @revid = revid
+    if grade && text
       @grade = grade
       @text = text
-      return
-    end
+      @id = dbl.record_review(revid, grade, text)
+    else
+      review = dbl.query_review(revid)
+      raise DBLayerError, "unregistered review" unless review
 
-    review = dbl.query_review(revid)
-    unless (review.nil?)
-      @id = review[0]
-      @revid = review[1]
-      @grade = review[2]
-      @text = review[3]
-      return
+      @id, @revid, @grade, @text = review
     end
-    
-    raise DBLayerError, 'unregistered review'
   end
 
-  private def to_s
-    <<-REVIEW
+  def to_s
+    <<~REVIEW
       User review: #{@id}
       \tReviewId: #{@revid}
       \tGrade: #{@grade}
-      \tText: #{text}
+      \tText: #{@text}
     REVIEW
   end
 end
