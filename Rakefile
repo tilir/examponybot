@@ -2,6 +2,7 @@ require 'rake/testtask'
 
 test_files = [
   'test/basic_smoke.rb',
+  'test/basic_dblayer.rb',
   'test/examstate_tests.rb',
   'test/userstate_tests.rb',
   'test/dbstructure/answer_tests.rb',
