@@ -9,7 +9,7 @@
 #
 #------------------------------------------------------------------------------
 
-require_relative "test_helper"
+require "test_helper"
 
 class FakeDB
   attr_reader :added_users, :users
