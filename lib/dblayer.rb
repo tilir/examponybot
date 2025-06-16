@@ -10,7 +10,7 @@
 #------------------------------------------------------------------------------
 
 require 'sqlite3'
-require_relative './dbstructure'
+require_relative 'dbstructure'
 
 class Logger
   def self.set_verbose(verbose)
@@ -19,7 +19,6 @@ class Logger
 
   def self.print(message)
     @@verbose ||= false
-    # p message
     p message if @@verbose
   end
 end
@@ -54,11 +53,10 @@ class DBLayer
     exit(1)
   end
 
-  def get_user_by_id(id)
-    rs = @db.get_first_row('SELECT * FROM users WHERE userid = ?', [id])
+  def get_user_by_id(userid)
+    rs = @db.get_first_row('SELECT * FROM users WHERE userid = ?', [userid])
     return nil if rs.nil? or rs.empty?
-
-    [rs[0], rs[1], rs[2], rs[3]]
+    return rs    
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close

@@ -9,18 +9,8 @@
 #
 #------------------------------------------------------------------------------
 
-EXAM_STATE = {
-  stopped: 0,
-  answering: 1,
-  reviewing: 2,
-  grading: 3
-}
-
-USER_STATE = {
-  privileged: 0,
-  regular: 1,
-  nonexistent: 2
-}
+require_relative 'examstate'
+require_relative 'userstate'
 
 class DBLayerError < StandardError
 end
@@ -85,55 +75,68 @@ class User
   attr_reader :id, :userid, :username, :privlevel
 
   def initialize(dbl, userid, privlevel = nil, username = nil)
-    @dbl = dbl
+    @dbl       = dbl
+    @userid    = userid
 
-    unless (username.nil? or privlevel.nil?)
-      @id = dbl.add_user(userid, privlevel, username)
-      @userid = userid
-      @username = username
-      @privlevel = privlevel
-      return
+    if username && privlevel
+      create_user(username, privlevel)
+    else
+      load_or_mark_nonexistent
     end
+  end
 
-    user = dbl.get_user_by_id(userid)
-    unless (user.nil?)
-      @id = user[0]
-      @userid = user[1]
-      @username = user[2]
-      @privlevel = user[3]
-      return
-    end
-
-    @privlevel = USER_STATE[:nonexistent]
+  def level
+    UserStates.to_sym(@privlevel)
   end
 
   def nth_question(examid, n)
-    @dbl.user_nth_question(examid, @id, n)
+    @dbl.user_nth_question(examid, id, n)
   end
 
-  def n_reviews
+  def review_count
     @dbl.nreviews(@userid)
   end
 
   def all_answers
-    @dbl.user_all_answers(@id)
+    @dbl.user_all_answers(id)
   end
 
   def to_userquestion(revid)
     @dbl.urid_to_uqid(@userid, revid)
   end
 
-  def is_privileged
-    @privlevel == 0
+  def to_s
+    <<~USER.chomp
+      User: #{id || '(not in DB)'}
+      \tUserId: #{@userid}
+      \tUserName: #{@username || '(none)'}
+      \tPriv:    #{@privlevel})
+    USER
   end
 
-  private def to_s
-    <<-USER
-      User: #{@id}
-      \tUserId: #{@userid}
-      \tUserName: #{@username}
-      \tPrivLevel: #{@privlevel}
-    USER
+  private
+
+  def create_user(name, level)
+    priv = UserStates.to_i(level.is_a?(Symbol) ? level : level.to_sym)
+    @id        = @dbl.add_user(@userid, priv, name)
+    @username  = name
+    @privlevel = priv
+    Logger.print "Created user: #{@id} #{@userid} #{@username} #{@privlevel}"
+  end
+
+  def load_or_mark_nonexistent
+    Logger.print "Query for #{@userid}"
+    record = @dbl.get_user_by_id(@userid)
+    if record
+      @id, @userid, @username, @privlevel = record
+      unless UserStates.valid?(@privlevel)
+        raise "Invalid user state code: #{@privlevel.inspect}"
+      end
+      Logger.print "Loaded from base: #{@username} #{@privlevel}"
+    else
+      @privlevel = UserStates.to_i(:nonexistent)
+      Logger.print "No user found"
+    end
   end
 end
 
@@ -174,26 +177,35 @@ class Question
 end
 
 class Exam
-  attr_reader :id, :name, :state
+  attr_reader :id, :name
 
   def initialize(dbl, name)
     exam = dbl.add_exam(name)
     @dbl = dbl
     @id = exam[0]
-    @state = exam[1]
+    @raw_state = exam[1]  # number
     @name = exam[2]
   end
 
-  def set_state(state)
-    @dbl.set_exam_state(@name, state)
-    @state = state
+  def state
+    ExamStates.to_sym(@raw_state)
+  end
+
+  def state_code
+    @raw_state
+  end
+
+  def set_state(state_sym)
+    code = ExamStates.to_i(state_sym)
+    @dbl.set_exam_state(@name, code)
+    @raw_state = code
   end
 
   private def to_s
-    <<-EXAM
+    <<~EXAM
       Exam: #{@id}
       \tName: #{@name}
-      \tState: #{@state}
+      \tState: #{state} (#{@raw_state})
     EXAM
   end
 end

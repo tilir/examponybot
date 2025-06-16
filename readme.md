@@ -1,42 +1,51 @@
-# Peer-review exam bot
+# Peer-review Exam Bot
 
-This bot is intended to help teachers with organization of peer-review exams.
+This bot helps teachers organize peer-review exams for students.
 
-## How to run
+## Installation & Running
 
-If you are sure everything is stable, just run providing API token.
+### Standard Run
+For stable operation, run with your Telegram bot token:
 
+```bash
+./ponybot.rb -t "YOUR_TELEGRAM_BOT_TOKEN"
 ```
-./ponybot.rb -t "TOKEN"
+
+### Debug Mode
+For debugging with verbose output to both console and log file:
+
+```bash
+./ponybot.rb -t "YOUR_TELEGRAM_BOT_TOKEN" -v | tee log
 ```
 
-Where TOKEN is your telegram bot token.
+## Exam Preparation
 
-Debug run is:
+### Creating Question Database
+Prepare exams offline using the ponymaker script. Example exam format is in the test folder.
 
+```bash
+./ponymaker.rb -f test/example_exam.txt -o exam.db
+./ponybot.rb -t "YOUR_TELEGRAM_BOT_TOKEN" -v -d exam.db | tee log
 ```
-./ponybot.rb -t "TOKEN" -v | tee log
-```
-This will verbosely output everything that happens on console and to log.
 
-## How to use
+## Using the Bot
 
-First you need register yourself: first registered usere considered admin.
+### Registration
+1. First registered user becomes admin
+2. Students register through the bot
 
-Next by series of /addquestion queries create exam.
+### Teacher Commands
+- /addquestion - add exam questions
+- /startexam - begin exam (students can submit answers)
+- /startreview - start peer-review phase
+- /setgrades - finalize grading
+- /stopexam - end exam (enables new registrations)
+- /exit - shutdown bot gracefully
 
-Now all students shall come and register themselves in your bot.
+## Contributing
+We welcome pull requests!
 
-Teacher starts exam with /startexam. Now students can post answers.
-
-Finally teacher issues /startreview command and peer review starts.
-
-Reviewing ends with /setgrades command from teacher.
-
-After grading is done, issue /stopexam and enable new registrations.
-
-## How to contribute
-
-Without fear. Merge requests are welcome.
-
-Your MR need to pass github actions pipeline before review.
+Requirements:
+- Your MR must pass GitHub Actions pipeline
+- Follow existing code style
+- Maintain stability

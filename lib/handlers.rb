@@ -55,7 +55,7 @@ class Handler
 
       # first user added with pedagogical priviledges
       if @dbl.users_empty?
-        User.new(@dbl, @tguser.id, USER_STATE[:privileged], name)
+        User.new(@dbl, @tguser.id, :privileged, name)
         @api.send_message(chat_id: @tguser.id, text: "Registered (privileged) as #{name}")
         return
       end
@@ -64,13 +64,13 @@ class Handler
       found = allu.find{ |usr| usr.userid == @tguser.id }
 
       # subsequent users added with student privileges
-      dbuser = User.new(@dbl, @tguser.id, USER_STATE[:regular], name)
+      dbuser = User.new(@dbl, @tguser.id, :regular, name)
       @api.send_message(chat_id: @tguser.id, text: "Registered/updated as #{name}")
  
       # new reg with running exam getting its questions
       if !@dbl.exams_empty?
         exam = Exam.new(@dbl, 'exam')
-        if found.nil? and exam.state != EXAM_STATE[:stopped]
+        if found.nil? and exam.state != :stopped
           nn = @dbl.n_questions
           nv = @dbl.n_variants
           prng = Random.new
@@ -187,7 +187,7 @@ class Handler
       @api.send_message(chat_id: @tguser.id, text: "Warning: #{nn} * #{nv} != #{allq.length}")
     end
 
-    def addexam
+    def addexam(rest = '')
       if @dbl.exams_empty?
         Exam.new(@dbl, 'exam')
         @api.send_message(chat_id: @tguser.id, text: 'Exam added')
@@ -196,13 +196,13 @@ class Handler
       end
     end
 
-    def startexam
+    def startexam(rest = '')
       exam = Exam.new(@dbl, 'exam')
-      if exam.state != EXAM_STATE[:stopped]
+      if exam.state != :stopped
         @api.send_message(chat_id: @tguser.id, text: 'Exam currently not in stopped mode')
         return
       end
-      exam.set_state(EXAM_STATE[:answering])
+      exam.set_state(:answering)
 
       allu = @dbl.all_nonpriv_users
       nn = @dbl.n_questions
@@ -219,17 +219,17 @@ class Handler
       end
     end
 
-    def stopexam
-      Exam.new(@dbl, 'exam').set_state(EXAM_STATE[:stopped])
+    def stopexam(rest = '')
+      Exam.new(@dbl, 'exam').set_state(:stopped)
     end
 
-    def startreview
+    def startreview(rest = '')
       exam = Exam.new(@dbl, 'exam')
-      if exam.state != EXAM_STATE[:answering]
+      if exam.state != :answering
         @api.send_message(chat_id: @tguser.id, text: 'Exam currently not in answering mode')
         return
       end
-      exam.set_state(EXAM_STATE[:reviewing])
+      exam.set_state(:reviewing)
 
       allu = @dbl.all_answered_users
       if allu.nil?
@@ -251,13 +251,13 @@ class Handler
       end
     end
 
-    def setgrades
+    def setgrades(rest = '')
       exam = Exam.new(@dbl, 'exam')
-      if exam.state != EXAM_STATE[:reviewing]
+      if exam.state != :reviewing
         @api.send_message(chat_id: @tguser.id, text: 'Exam currently not in reviewing mode')
         return
       end
-      exam.set_state(EXAM_STATE[:grading])
+      exam.set_state(:grading)
 
       nn = @dbl.n_questions
       nv = @dbl.n_variants
@@ -311,11 +311,11 @@ class Handler
         /addquestion n v text
         /questions
         /users
-        /addexam
-        /startexam
-        /startreview
-        /setgrades
-        /stopexam
+        /addexam [name]
+        /startexam [name]
+        /startreview [name]
+        /setgrades [name]
+        /stopexam [name]
         /reload
         /exit
       HELP
@@ -335,7 +335,7 @@ class Handler
 
     def answer(rest = '')
       exam = Exam.new(@dbl, 'exam')
-      if exam.state != EXAM_STATE[:answering]
+      if exam.state != :answering
         @api.send_message(chat_id: @tguser.id, text: 'Exam not accepting answers now')
         return
       end
@@ -415,7 +415,7 @@ class Handler
 
     def review(rest = '')
       exam = Exam.new(@dbl, 'exam')
-      if exam.state != EXAM_STATE[:reviewing]
+      if exam.state != :reviewing
         @api.send_message(chat_id: @tguser.id, text: 'Exam not accepting reviews now')
         return
       end
@@ -480,8 +480,8 @@ class Handler
 
   private def get_command(api, tguser)
     dbuser = User.new(@dbl, tguser.id)
-    return Command.new(api, tguser, @dbl) if dbuser.privlevel == USER_STATE[:nonexistent]
-    return PrivilegedCommand.new(api, tguser, @dbl) if dbuser.privlevel == USER_STATE[:privileged]
+    return Command.new(api, tguser, @dbl) if dbuser.level == :nonexistent
+    return PrivilegedCommand.new(api, tguser, @dbl) if dbuser.level == :privileged
 
     NonPrivilegedCommand.new(api, tguser, @dbl)
   end

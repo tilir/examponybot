@@ -13,6 +13,7 @@ class PseudoApi
   attr_accessor :text
   def send_message(chat_id:, text:)
     @text = "#{chat_id} : #{text}"
+    Logger.print @text
   end
 end
 

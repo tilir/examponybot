@@ -19,6 +19,7 @@ class QuestionImporter
     @api = api
     @prepod = prepod
     @chat = chat
+    @verbose = false
   end
 
   def import!
@@ -35,7 +36,7 @@ class QuestionImporter
 
     grouped_questions.each_with_index do |questions, grp_index|
       group_id = grp_index + 1
-      puts "Group #{group_id} (#{questions.size} questions)"
+      puts "Group #{group_id} (#{questions.size} questions)" if @verbose
 
       questions.each_with_index do |question_text, question_index|
         question_id = question_index + 1
@@ -77,6 +78,6 @@ class QuestionImporter
     event = PseudoMessage.new(@prepod, @chat, full_text)
     @handler.process_message(@api, event)
 
-    puts "Q#{exam_id}.#{question_id} added: #{@api.text}"
+    puts "Q#{exam_id}.#{question_id} added: #{@api.text}" if @verbose
   end
 end

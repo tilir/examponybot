@@ -12,6 +12,10 @@
 require 'handlers'
 require 'pseudoapi'
 require 'test_helper'
+require 'importer'
+
+# set to true for lots of debug output
+Logger.set_verbose(false)
 
 describe "PonyBot register privileged" do
   before { setup_test_env }
@@ -41,6 +45,20 @@ describe "PonyBot create start and stop exam" do
     @handler.process_message(@api, event)
     assert_equal "167346988 : Exam added", @api.text
     refute @dbl.exams_empty?
+
+    exam_path = File.expand_path("example_exam.txt", __dir__)
+
+    importer = QuestionImporter.new(
+      filename: exam_path,
+      handler: @handler,
+      api: @api,
+      prepod: @prepod,
+      chat: @chat
+    )
+    importer.import!
+
+    assert_equal 3, @dbl.n_questions
+    assert_equal 3, @dbl.n_variants
   end
 end
 
