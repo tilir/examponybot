@@ -220,14 +220,13 @@ class DBLayer
 
   def user_nth_question(eid, uid, n)
     multiline = <<-SQL
-      SELECT * FROM userquestions
+      SELECT exam, user, question FROM userquestions
       INNER JOIN questions ON userquestions.question = questions.id
       WHERE userquestions.exam = ? AND userquestions.user = ? AND questions.number = ?
     SQL
     rs = @db.get_first_row("#{multiline}", [eid, uid, n])
     return nil if rs.nil?
-
-    UserQuestion.new(self, rs[1], rs[2], rs[3])
+    return [rs[0], rs[1], rs[2]]
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close
@@ -312,14 +311,13 @@ class DBLayer
 
   def awid_to_userquestion(awid)
     multiline = <<-SQL
-      SELECT * FROM userquestions
+      SELECT exam, user, question FROM userquestions
       INNER JOIN answers ON userquestions.id = answers.uqid
       WHERE answers.id = ?
     SQL
     rs = @db.get_first_row(multiline, [awid])
     return nil if rs.nil?
-
-    UserQuestion.new(self, rs[1], rs[2], rs[3])
+    [rs[0], rs[1], rs[2]]
   rescue SQLite3::Exception => e
     puts "#{__FILE__}:#{__LINE__}:#{e}"
     close

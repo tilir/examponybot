@@ -103,7 +103,8 @@ class User
   end
 
   def nth_question(examid, n)
-    @dbl.user_nth_question(examid, id, n)
+    eid, uid, qid = @dbl.user_nth_question(examid, id, n)
+    UserQuestion.new @dbl, eid, uid, qid
   end
 
   def review_count
@@ -275,7 +276,15 @@ class Answer
   end
 
   def to_question
-    userquestion = @dbl.awid_to_userquestion(@id)
+    uqrecord = @dbl.awid_to_userquestion(@id)
+
+    if uqrecord
+      examid, uid, qid = uqrecord 
+      userquestion = UserQuestion.new @dbl, examid, uid, qid      
+    else
+      raise DBLayerError, 'tried to get unregistered answer'
+    end
+
     userquestion.to_question
   end
 

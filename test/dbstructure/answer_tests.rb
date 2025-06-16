@@ -63,7 +63,7 @@ describe "UserQuestion and Answer" do
     it "returns a Question from DB" do
       dbl.expect :record_answer, answer_id, [uqid, "Text"]
       dbl.expect :register_question, uqid, [examid, userid, questionid]
-      dbl.expect :awid_to_userquestion, UserQuestion.new(dbl, examid, userid, questionid), [answer_id]
+      dbl.expect :awid_to_userquestion, [examid, userid, questionid], [answer_id]
       dbl.expect :add_question, questionid, [1, 2, "Sample?"]
       dbl.expect :uqid_to_question, [dbl, 1, 2, "Sample?"], [uqid]
 
