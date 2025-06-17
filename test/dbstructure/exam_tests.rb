@@ -21,7 +21,10 @@ describe Exam do
   describe "initialization" do
     it "creates exam with correct attributes" do
       # Setup mock expectations
+      db.expect(:nil?, false)
       db.expect(:exams, db)
+      db.expect(:exams, db)
+      db.expect(:find_by_name, nil, [exam_name])
       db.expect(:add_exam, 
                 DBExam.new(exam_id, initial_state, exam_name), 
                 [exam_name])
@@ -40,7 +43,10 @@ describe Exam do
   describe "string representation" do
     it "returns formatted exam details" do
       # Setup
+      db.expect(:nil?, false)
       db.expect(:exams, db)
+      db.expect(:exams, db)
+      db.expect(:find_by_name, nil, [exam_name])
       db.expect(:add_exam, 
                 DBExam.new(exam_id, initial_state, exam_name), 
                 [exam_name])
@@ -65,6 +71,9 @@ describe Exam do
     it "prevents creating multiple exams" do
       # First exam should succeed
       db.expect(:exams, db)
+      db.expect(:exams, db)
+      db.expect(:nil?, false)
+      db.expect(:find_by_name, nil, ["First Exam"])
       db.expect(:add_exam, DBExam.new(1, 0, "First Exam"), ["First Exam"])
 
       Exam.new(db, "First Exam")

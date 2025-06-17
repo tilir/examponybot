@@ -20,7 +20,7 @@ Rake::TestTask.new(:test) do |t|
 end
 
 # to run like:
-# > rake group['UserQuestion and Answer Integration']
+# > bundle exec rake group['Smoke']
 task :group, [:group_name] do |t, args|
   require 'find'
   

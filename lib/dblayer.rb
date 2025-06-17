@@ -195,6 +195,7 @@ class QuestionManager
 
   alias_method :find, :get_question
   alias_method :add, :add_question
+  alias_method :all, :all_questions
 end
 
 class ExamManager
@@ -210,15 +211,19 @@ class ExamManager
   def add_exam(name)
     if exams_empty?
       @db.execute('INSERT INTO exams (state, name) VALUES (?, ?)', 0, name)
-      Logger.print 'exam added'
-      row = @db.get_first_row('SELECT id, state, name FROM exams WHERE name = ?', name)
-      DBExam.from_db_row(row)
+      Logger.print "exam #{name} added"
+      find_by_name(name)
     else
       Logger.print 'sorry only one exam supported'
       nil
     end
   end
   
+  def find_by_name(name)
+    row = @db.get_first_row('SELECT id, state, name FROM exams WHERE name = ?', name)
+    row.nil? ? nil : DBExam.from_db_row(row)
+  end
+
   def set_exam_state(name, state)
     row = @db.get_first_row('SELECT id FROM exams WHERE name = ?', name)
     return nil if row.nil?
@@ -238,6 +243,8 @@ class UserQuestionManager
   end
 
   def register_question(eid, uid, qid)
+    raise ArgumentError, 'qid cannot be nil' if qid.nil?
+
     row = @db.get_first_row(
       'SELECT id FROM userquestions WHERE exam = ? AND user = ? AND question = ?',
       eid, uid, qid
@@ -255,7 +262,7 @@ class UserQuestionManager
       row = @db.get_first_row('SELECT id, exam, user, question FROM userquestions WHERE id = ?', row[0])
     end
     
-    DBUserQuestion.from_db_row(row)
+    row.nil? ? nil : DBUserQuestion.from_db_row(row)
   end
 
   def user_nth_question(eid, uid, n)
@@ -304,8 +311,9 @@ class AnswerManager
     row = @db.get_first_row('SELECT uqid FROM answers WHERE id = ?', awid)
     return nil if row.nil?
     
-    row = @db.get_first_row('SELECT exam, user, question FROM userquestions WHERE id = ?', row[0])
-    DBUserQuestion.from_db_row(row)
+    row = @db.get_first_row('SELECT id, exam, user, question FROM userquestions WHERE id = ?', row[0])
+    dbu = DBUserQuestion.from_db_row(row)
+    UserQuestion.new(@db, dbu.exam_id, dbu.user_id, dbu.question_id) 
   end
 
   def uqid_to_question(uqid)
@@ -331,11 +339,12 @@ class AnswerManager
       INNER JOIN users ON users.id = userquestions.user
       INNER JOIN answers ON userquestions.id = answers.uqid
     SQL
-    @db.execute(query).map { |row| DBUser.from_db_row(row) }
+    @db.execute(query).map { |row| User.from_db_user(@db, DBUser.from_db_row(row)) }
   end
 
   alias_method :create_or_update, :record_answer
   alias_method :find_by_user_question, :uqid_to_answer
+  alias_method :find_by_answer, :awid_to_userquestion
 end
 
 class ReviewManager
@@ -418,4 +427,6 @@ class ReviewManager
 
   alias_method :assign_reviewer, :create_review_assignment
   alias_method :submit, :record_review
+  alias_method :count_by_user, :nreviews
+  alias_method :find_by_assignment, :query_review
 end

@@ -11,7 +11,7 @@
 
 require_relative './dblayer'
 
-N_REVIEWERS = 3
+N_REVIEWERS = 2
 
 class Handler
   attr_accessor :dbl # test purposes only
@@ -60,7 +60,7 @@ class Handler
         return
       end
 
-      allu = @dbl.all_nonpriv_users
+      allu = @dbl.users.all_nonpriv
       found = allu.find{ |usr| usr.userid == @tguser.id }
 
       # subsequent users added with student privileges
@@ -71,8 +71,8 @@ class Handler
       if !@dbl.exams.empty?
         exam = Exam.new(@dbl, 'exam')
         if found.nil? and exam.state != :stopped
-          nn = @dbl.n_questions
-          nv = @dbl.n_variants
+          nn = @dbl.questions.n_questions
+          nv = @dbl.questions.n_variants
           prng = Random.new
 
           (1..nn).each do |n|
@@ -100,7 +100,7 @@ class Handler
   class PrivilegedCommand < Command
     # utils
     private def qualify_users(api, tguser, userreq)
-      allu = @dbl.all_answered_users
+      allu = @dbl.answers.all_answered_users
       if allu.nil?
         api.send_message(chat_id: tguser.id, text: 'No answered users yet')
         return []
@@ -108,7 +108,7 @@ class Handler
 
       qualified = []
       allu.each do |user|
-        userrevs = user.n_reviews
+        userrevs = user.review_count
         if userrevs < userreq
           txt = <<~TXT
             You haven't done your reviewing due.
@@ -141,7 +141,7 @@ class Handler
         txt = <<~TXT
           Review assignment: #{review.id}
           --- Question ---
-          #{qst.text}
+          #{qst.question}
           --- Answer ---
           #{ans.text}
         TXT
@@ -151,7 +151,7 @@ class Handler
 
     # iterface
     def users
-      allu = @dbl.all_users
+      allu = @dbl.users.all
       @api.send_message(chat_id: @tguser.id, text: '--- all users ---')
       allu.each do |usr|
         @api.send_message(chat_id: @tguser.id, text: "#{usr.userid} #{usr.username} #{usr.privlevel}")
@@ -173,15 +173,15 @@ class Handler
     end
 
     def questions
-      allq = @dbl.all_questions
+      allq = @dbl.questions.all
       @api.send_message(chat_id: @tguser.id, text: '--- all questions ---')
       allq.each do |qst|
-        @api.send_message(chat_id: @tguser.id, text: "#{qst.number} #{qst.variant} #{qst.text}")
+        @api.send_message(chat_id: @tguser.id, text: "#{qst.number} #{qst.variant} #{qst.question}")
       end
       @api.send_message(chat_id: @tguser.id, text: '---')
 
-      nn = @dbl.n_questions
-      nv = @dbl.n_variants
+      nn = @dbl.questions.n_questions
+      nv = @dbl.questions.n_variants
       return unless nn * nv != allq.length
 
       @api.send_message(chat_id: @tguser.id, text: "Warning: #{nn} * #{nv} != #{allq.length}")
@@ -204,9 +204,9 @@ class Handler
       end
       exam.set_state(:answering)
 
-      allu = @dbl.all_nonpriv_users
-      nn = @dbl.n_questions
-      nv = @dbl.n_variants
+      allu = @dbl.users.all_nonpriv
+      nn = @dbl.questions.n_questions
+      nv = @dbl.questions.n_variants
       prng = Random.new
 
       allu.each do |dbuser|
@@ -231,7 +231,7 @@ class Handler
       end
       exam.set_state(:reviewing)
 
-      allu = @dbl.all_answered_users
+      allu = @dbl.answers.all_answered_users
       if allu.nil?
         @api.send_message(chat_id: @tguser.id, text: 'No answered users yet')
         return
@@ -259,8 +259,8 @@ class Handler
       end
       exam.set_state(:grading)
 
-      nn = @dbl.n_questions
-      nv = @dbl.n_variants
+      nn = @dbl.questions.n_questions
+      nv = @dbl.questions.n_variants
       userreq = nv * N_REVIEWERS
 
       qualified = qualify_users(@api, @tguser, userreq)
@@ -277,7 +277,7 @@ class Handler
           txt = <<~TXT
             Reviews for your question #{qst.number}
             --- Question text ---
-            #{qst.text}
+            #{qst.question}
           TXT
           @api.send_message(chat_id: user.userid, text: txt)
           allrevs.each do |rev|
@@ -324,7 +324,7 @@ class Handler
 
   class NonPrivilegedCommand < Command
     private def check_question_number(n)
-      nn = @dbl.n_questions
+      nn = @dbl.questions.n_questions
       if (n > nn) or (n < 1)
         @api.send_message(chat_id: @tguser.id,
                           text: "Question have incorrect number #{n}. Allowed range: [1 .. #{nn}].")
@@ -384,7 +384,7 @@ class Handler
         return
       end
 
-      @api.send_message(chat_id: @tguser.id, text: qst.text)
+      @api.send_message(chat_id: @tguser.id, text: qst.question)
     end
 
     def lookup_answer(rest = '')
@@ -441,9 +441,9 @@ class Handler
       Review.new(@dbl, urid, g, t)
       @api.send_message(chat_id: @tguser.id, text: "Review assignment #{urid} recorded/updated")
 
-      nv = @dbl.n_variants
+      nv = @dbl.questions.n_variants
       userreq = nv * N_REVIEWERS
-      userrevs = dbuser.n_reviews
+      userrevs = dbuser.review_count
       @api.send_message(chat_id: @tguser.id, text: "You sent #{userrevs} out of #{userreq} required reviews")
     end
 

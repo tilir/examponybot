@@ -56,10 +56,10 @@ class User < DBUser
   end
 
   def nth_question(exam_id, question_number)
-    user_question_data = @db.user_questions.user_nth_question(exam_id, id, question_number)
-    return nil unless user_question_data
+    uq = @db.user_questions.user_nth_question(exam_id, id, question_number)
+    return nil unless uq
     
-    UserQuestion.new(@db, *user_question_data)
+    UserQuestion.new(@db, uq.exam_id, uq.user_id, uq.question_id)
   end
 
   def review_count
@@ -68,7 +68,7 @@ class User < DBUser
 
   def all_answers
     @db.answers.user_all_answers(id).map do |answer|
-      Answer.new(@db, answer.id, answer.user_question_id, answer.answer)
+      Answer.new(@db, answer.user_question_id, answer.answer)
     end
   end
 
@@ -117,11 +117,22 @@ end
 
 class Exam < DBExam
   def initialize(db_layer, name)
-    db_exam = db_layer.exams.add_exam(name)
-    raise "Exam creation failed" unless db_exam
-    
-    super(db_exam.id, db_exam.state, db_exam.name)
+    raise ArgumentError, 'DB layer must be provided' if db_layer.nil?
+    raise ArgumentError, 'Exam name must be provided' if name.nil? || name.empty?
+
     @db = db_layer
+    
+    # First try to find existing exam
+    db_exam = @db.exams.find_by_name(name)
+    
+    # If not found - create new one
+    unless db_exam
+      db_exam = @db.exams.add_exam(name)
+      raise "Exam creation failed" unless db_exam
+    end
+
+    # Initialize parent class
+    super(db_exam.id, db_exam.state, db_exam.name)
   end
 
   def state
@@ -146,6 +157,8 @@ end
 
 class UserQuestion < DBUserQuestion
   def initialize(db_layer, exam_id, user_id, question_id)
+    raise ArgumentError, 'question_id cannot be nil' if question_id.nil?
+
     db_user_question = db_layer.user_questions.register(exam_id, user_id, question_id)
     super(db_user_question.id, db_user_question.exam_id, db_user_question.user_id, db_user_question.question_id)
     @db = db_layer
@@ -157,8 +170,8 @@ class UserQuestion < DBUserQuestion
   end
 
   def question
-    db_question = @db.questions.find_by_user_question(id)
-    db_question ? Question.new(@db, number: db_question.number, variant: db_question.variant) : nil
+    db_question = @db.answers.uqid_to_question(id)
+    db_question ? Question.new(@db, db_question.number, db_question.variant, db_question.question) : nil
   end
 
   def to_s
@@ -195,7 +208,7 @@ class Answer < DBAnswer
   end
 
   def question
-    user_question = @db.user_questions.find_by_answer(id)
+    user_question = @db.answers.find_by_answer(id)
     raise "Answer not registered" unless user_question
     
     user_question.question
