@@ -14,70 +14,116 @@ require 'minitest/spec'
 require 'minitest/mock'
 require 'dbstructure'
 
-describe "UserReview and Review" do
-  let(:dbl) { Minitest::Mock.new }
-  let(:userid) { 1 }
-  let(:uqid) { 42 }
-  let(:revid) { 100 }
+describe "Review System" do
+  let(:db) { Minitest::Mock.new }
+  let(:reviewer_id) { 1 }
+  let(:user_question_id) { 42 }
+  let(:review_assignment_id) { 100 }
   let(:review_id) { 99 }
+  let(:grade) { 5 }
+  let(:review_text) { "Excellent work" }
 
   describe UserReview do
-    it "creates a new review assignment" do
-      dbl.expect :create_review_assignment, 55, [userid, uqid]
-      ur = UserReview.new(dbl, userid, uqid)
+    it "creates new review assignment successfully" do
+      # Setup mock
+      db.expect(:reviews, db)
+      db.expect(:assign_reviewer,
+                DBUserReview.new(review_assignment_id, reviewer_id, user_question_id),
+                [reviewer_id, user_question_id])
 
-      assert_equal 55, ur.id
-      assert_equal userid, ur.userid
-      assert_equal uqid, ur.userquestionid
-      dbl.verify
+      # Exercise
+      assignment = UserReview.new(db, reviewer_id, user_question_id)
+
+      # Verify
+      assert_equal review_assignment_id, assignment.id
+      assert_equal reviewer_id, assignment.reviewer_id
+      assert_equal user_question_id, assignment.user_question_id
+      db.verify
     end
 
-    it "prints string representation" do
-      dbl.expect :create_review_assignment, 55, [userid, uqid]
-      ur = UserReview.new(dbl, userid, uqid)
+    it "generates proper string representation" do
+      # Setup
+      db.expect(:reviews, db)
+      db.expect(:assign_reviewer, 
+                DBUserReview.new(review_assignment_id, reviewer_id, user_question_id),
+                [reviewer_id, user_question_id])
 
-      str = ur.to_s
-      assert_includes str, "UserId: 1"
-      assert_includes str, "UserQuestionId: 42"
-      dbl.verify
+      # Exercise
+      assignment = UserReview.new(db, reviewer_id, user_question_id)
+      output = assignment.to_s
+
+      # Verify
+      assert_includes output, "Reviewer: #{reviewer_id}"
+      assert_includes output, "UserQuestion: #{user_question_id}"
+      db.verify
     end
   end
 
   describe Review do
-    it "records a new review when grade and text are given" do
-      dbl.expect :record_review, review_id, [revid, 5, "Well done"]
-      review = Review.new(dbl, revid, 5, "Well done")
+    describe "creating new review" do
+      it "records review with grade and feedback" do
+        # Setup
+        db.expect(:reviews, db)
+        db.expect(:submit,
+                  DBReview.new(review_id, review_assignment_id, grade, review_text),
+                  [review_assignment_id, grade, review_text])
 
-      assert_equal review_id, review.id
-      assert_equal 5, review.grade
-      assert_equal "Well done", review.text
-      dbl.verify
+        # Exercise
+        review = Review.new(db, review_assignment_id, grade, review_text)
+
+        # Verify
+        assert_equal review_id, review.id
+        assert_equal grade, review.grade
+        assert_equal review_text, review.review
+        db.verify
+      end
     end
 
-    it "loads a review from DB if no grade/text provided" do
-      dbl.expect :query_review, [review_id, revid, 4, "Nice"], [revid]
-      review = Review.new(dbl, revid)
+    describe "loading existing review" do
+      it "retrieves review details from database" do
+        # Setup
+        db.expect(:reviews, db)
+        db.expect(:find_by_assignment,
+                  DBReview.new(review_id, review_assignment_id, grade, review_text),
+                  [review_assignment_id])
 
-      assert_equal 4, review.grade
-      assert_equal "Nice", review.text
-      assert_equal review_id, review.id
-      dbl.verify
+        # Exercise
+        review = Review.new(db, review_assignment_id)
+
+        # Verify
+        assert_equal grade, review.grade
+        assert_equal review_text, review.review
+        db.verify
+      end
+
+      it "raises error when review not found" do
+        # Setup
+        db.expect(:reviews, db)
+        db.expect(:find_by_assignment, nil, [review_assignment_id])
+
+        # Exercise/Verify
+        assert_raises("Review not found") do
+          Review.new(db, review_assignment_id)
+        end
+        db.verify
+      end
     end
 
-    it "raises error if review not found in DB" do
-      dbl.expect :query_review, nil, [revid]
-      assert_raises(DBLayerError) { Review.new(dbl, revid) }
-      dbl.verify
-    end
+    it "generates correct string representation" do
+      # Setup
+      db.expect(:reviews, db)
+      db.expect(:submit,
+                DBReview.new(review_id, review_assignment_id, grade, review_text),
+                [review_assignment_id, grade, review_text])
 
-    it "generates string representation" do
-      dbl.expect :record_review, review_id, [revid, 3, "OK"]
-      r = Review.new(dbl, revid, 3, "OK")
+      # Exercise
+      review = Review.new(db, review_assignment_id, grade, review_text)
+      output = review.to_s
 
-      str = r.to_s
-      assert_includes str, "Grade: 3"
-      assert_includes str, "Text: OK"
-      dbl.verify
+      # Verify
+      assert_includes output, "Grade: #{grade}"
+      assert_includes output, "Text: #{review_text}"
+      db.verify
     end
   end
 end

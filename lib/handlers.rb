@@ -54,7 +54,7 @@ class Handler
       Logger.print "register_user: #{name}"
 
       # first user added with pedagogical priviledges
-      if @dbl.users_empty?
+      if @dbl.users.empty?
         User.new(@dbl, @tguser.id, :privileged, name)
         @api.send_message(chat_id: @tguser.id, text: "Registered (privileged) as #{name}")
         return
@@ -68,7 +68,7 @@ class Handler
       @api.send_message(chat_id: @tguser.id, text: "Registered/updated as #{name}")
  
       # new reg with running exam getting its questions
-      if !@dbl.exams_empty?
+      if !@dbl.exams.empty?
         exam = Exam.new(@dbl, 'exam')
         if found.nil? and exam.state != :stopped
           nn = @dbl.n_questions
@@ -188,7 +188,7 @@ class Handler
     end
 
     def addexam(rest = '')
-      if @dbl.exams_empty?
+      if @dbl.exams.empty?
         Exam.new(@dbl, 'exam')
         @api.send_message(chat_id: @tguser.id, text: 'Exam added')
       else

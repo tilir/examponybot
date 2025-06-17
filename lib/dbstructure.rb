@@ -11,291 +11,259 @@
 
 require_relative 'examstate'
 require_relative 'userstate'
+require_relative 'schema'
 
-class User
-  attr_reader :id, :userid, :username, :privlevel
-
-  # generate methods like user.privileged? etc...
-  UserStates::STATES.keys.each do |state_name|
-    define_method "#{state_name}?" do
-      @privlevel == UserStates.to_i(state_name)
-    end
+class User < DBUser
+  UserStates::STATES.each_key do |state|
+    define_method("#{state}?") { privlevel == UserStates.to_i(state) }
   end
 
-  def initialize(dbl, userid, privlevel = nil, username = nil)
-    @dbl       = dbl
-    @userid    = userid
+  def self.from_db_user(db_layer, db_user)
+    raise ArgumentError, 'DB layer must be provided' if db_layer.nil?
+    raise ArgumentError, 'DBUser must be provided' if db_user.nil?
 
+    user = allocate  # Создаем неинициализированный объект
+    user.instance_variable_set(:@db, db_layer)
+    user.instance_variable_set(:@id, db_user.id)
+    user.instance_variable_set(:@userid, db_user.userid)
+    user.instance_variable_set(:@username, db_user.username)
+    user.instance_variable_set(:@privlevel, db_user.privlevel)
+    user
+  end
+
+  def initialize(db_layer, userid, privlevel = nil, username = nil)
+    raise ArgumentError, 'db_layer and userid shall not be nil' if db_layer.nil? || userid.nil?
+    @db = db_layer
+    
     if username && privlevel
-      create_user(username, privlevel)
+      # Create new user mode
+      privlevel = UserStates.to_i(privlevel) if privlevel.is_a?(Symbol)
+      db_user = @db.users.add_user(userid, privlevel, username)
+      super(db_user.id, db_user.userid, db_user.username, db_user.privlevel)
     else
-      load_or_mark_nonexistent
+      # Load existing user mode
+      db_user = @db.users.get_user_by_id(userid)
+      if db_user
+        super(db_user.id, db_user.userid, db_user.username, db_user.privlevel)
+      else
+        @privlevel = UserStates.to_i(:nonexistent)
+      end
     end
   end
 
   def level
-    UserStates.to_sym(@privlevel)
+    UserStates.to_sym(privlevel)
   end
 
-  def nth_question(examid, n)
-    eid, uid, qid = @dbl.user_nth_question(examid, id, n)
-    UserQuestion.new @dbl, eid, uid, qid
+  def nth_question(exam_id, question_number)
+    user_question_data = @db.user_questions.user_nth_question(exam_id, id, question_number)
+    return nil unless user_question_data
+    
+    UserQuestion.new(@db, *user_question_data)
   end
 
   def review_count
-    @dbl.nreviews(@userid)
+    @db.reviews.count_by_user(id)
   end
 
   def all_answers
-    @dbl.user_all_answers(id)
+    @db.answers.user_all_answers(id).map do |answer|
+      Answer.new(@db, answer.id, answer.user_question_id, answer.answer)
+    end
   end
 
-  def to_userquestion(revid)
-    @dbl.urid_to_uqid(@userid, revid)
+  def to_userquestion(review_id)
+    @db.reviews.urid_to_uqid(id, review_id)
   end
 
   def to_s
-    <<~USER.chomp
+    <<~USER_INFO.chomp
       User: #{id || '(not in DB)'}
-      \tUserId: #{@userid}
-      \tUserName: #{@username || '(none)'}
-      \tPriv:    #{@privlevel})
-    USER
-  end
-
-  private
-
-  def create_user(name, level)
-    priv = UserStates.to_i(level.is_a?(Symbol) ? level : level.to_sym)
-    @id        = @dbl.add_user(@userid, priv, name)
-    @username  = name
-    @privlevel = priv
-    Logger.print "Created user: #{@id} #{@userid} #{@username} #{@privlevel}"
-  end
-
-  def load_or_mark_nonexistent
-    Logger.print "Query for #{@userid}"
-    record = @dbl.get_user_by_id(@userid)
-    if record
-      @id, @userid, @username, @privlevel = record
-      unless UserStates.valid?(@privlevel)
-        raise ArgumentError, "Invalid user state code: #{@privlevel.inspect}"
-      end
-      Logger.print "Loaded from base: #{@username} #{@privlevel}"
-    else
-      @privlevel = UserStates.to_i(:nonexistent)
-      Logger.print "No user found"
-    end
+      \tUserID: #{userid}
+      \tUsername: #{username || '(none)'}
+      \tPrivilege: #{level} (#{privlevel})
+    USER_INFO
   end
 end
 
-class Question
-  attr_reader :id, :number, :variant, :text
-
-  def initialize(dbl, number, variant, text = nil)
-    @dbl = dbl
-    @number = number
-    @variant = variant
-
+class Question < DBQuestion
+  def initialize(db_layer, number, variant, text = nil)
+    @db = db_layer
+    
     if text
-      create_question(text)
+      # Create new question mode
+      db_question = @db.questions.add_question(number, variant, text)
+      super(db_question.id, db_question.number, db_question.variant, db_question.question)
     else
-      load_question_or_fail
+      # Load existing question mode
+      db_question = @db.questions.get_question(number, variant)
+      raise "Question #{number}/#{variant} not found" unless db_question
+      super(db_question.id, db_question.number, db_question.variant, db_question.question)
     end
   end
 
   def to_s
-    <<~QUESTION.chomp
-      Question: #{id || '(not in DB)'}
-      \tNumber: #{@number}
-      \tVariant: #{@variant}
-      \tText: #{@text || '(none)'}
-    QUESTION
+    <<~TEXT.chomp
+      Question #{id}:
+      \tNumber:  #{number}
+      \tVariant: #{variant}
+      \tText:    #{question}
+    TEXT
   end
 
-  private
-
-  def create_question(text)
-    @id = @dbl.add_question(@number, @variant, text)
-    @text = text
-  end
-
-  def load_question_or_fail
-    record = @dbl.get_question(@number, @variant)
-    if record
-      @id, @number, @variant, @text = record
-    else
-      raise DBLayerError, "Tried to get unregistered question (#{@number}, #{@variant})"
-    end
-  end
+  # Alias for backward compatibility
+  alias_method :text, :question
 end
 
-class Exam
-  attr_reader :id, :name
-
-  def initialize(dbl, name)
-    exam = dbl.add_exam(name)
-    @dbl = dbl
-    @id = exam[0]
-    @raw_state = exam[1]  # number
-    @name = exam[2]
+class Exam < DBExam
+  def initialize(db_layer, name)
+    db_exam = db_layer.exams.add_exam(name)
+    raise "Exam creation failed" unless db_exam
+    
+    super(db_exam.id, db_exam.state, db_exam.name)
+    @db = db_layer
   end
 
   def state
-    ExamStates.to_sym(@raw_state)
+    ExamStates.to_sym(super)
   end
 
-  def set_state(state_sym)
-    code = ExamStates.to_i(state_sym)
-    @dbl.set_exam_state(@name, code)
-    @raw_state = code
+  def set_state(new_state)
+    code = ExamStates.to_i(new_state)
+    updated_exam = @db.exams.set_exam_state(name, code)
+    @state = code # Обновляем внутреннее состояние
+    updated_exam
   end
 
   def to_s
-    <<~EXAM
-      Exam: #{@id}
-      \tName: #{@name}
-      \tState: #{state} (#{@raw_state})
+    <<~EXAM.chomp
+      Exam: #{id}
+      \tName: #{name}
+      \tState: #{state} (#{@state})
     EXAM
   end
 end
 
-class UserQuestion
-  attr_reader :id, :examid, :userid, :questionid
-
-  def initialize(dbl, examid, userid, questionid)
-    @dbl = dbl
-    @id = dbl.register_question(examid, userid, questionid)
-    @examid = examid
-    @userid = userid
-    @questionid = questionid
+class UserQuestion < DBUserQuestion
+  def initialize(db_layer, exam_id, user_id, question_id)
+    db_user_question = db_layer.user_questions.register(exam_id, user_id, question_id)
+    super(db_user_question.id, db_user_question.exam_id, db_user_question.user_id, db_user_question.question_id)
+    @db = db_layer
   end
 
-  def to_answer
-    answer = @dbl.uqid_to_answer(@id)
-    return nil if answer.nil?
-
-    Answer.new(@dbl, @id)
+  def answer
+    db_answer = @db.answers.find_by_user_question(id)
+    db_answer ? Answer.new(@db, db_answer.user_question_id, db_answer.answer) : nil
   end
 
-  def to_question
-    question = @dbl.uqid_to_question(@id)
-    return nil if question.nil?
-
-    # question is [id, number, variant, text], so we pass number, variant, text
-    Question.new(@dbl, question[1], question[2], question[3])
+  def question
+    db_question = @db.questions.find_by_user_question(id)
+    db_question ? Question.new(@db, number: db_question.number, variant: db_question.variant) : nil
   end
 
   def to_s
-    <<~USERQUESTION.chomp
-      User question: #{@id}
-      \tExamId: #{@examid}
-      \tUserId: #{@userid}
-      \tQuestionId: #{@questionid}
-    USERQUESTION
+    <<~TEXT.chomp
+      UserQuestion #{id}:
+      \tExam: #{exam_id}
+      \tUser: #{user_id}
+      \tQuestion: #{question_id}
+    TEXT
+  end
+
+  # Just compatibility
+  alias_method :examid, :exam_id
+  alias_method :userid, :user_id
+  alias_method :questionid, :question_id
+  alias_method :to_answer, :answer
+  alias_method :to_question, :question
+end
+
+class Answer < DBAnswer
+  def initialize(db_layer, uqid, text = nil)
+    @db = db_layer
+    
+    db_answer = 
+      if text
+        @db.answers.create_or_update(uqid, text)
+      else
+        @db.answers.find_by_user_question(uqid) || 
+          raise("Answer not found for UQID #{uqid}")
+      end
+
+    # Initialize the parent class with data from the database
+    super(db_answer.id, db_answer.user_question_id, db_answer.answer)
+  end
+
+  def question
+    user_question = @db.user_questions.find_by_answer(id)
+    raise "Answer not registered" unless user_question
+    
+    user_question.question
+  end
+
+  def reviews
+    @db.reviews.all_for_answer(uqid)
+  end
+
+  def to_s
+    <<~TEXT.chomp
+      Answer #{id}:
+      \tUserQuestion: #{user_question_id}
+      \tText: #{answer}
+    TEXT
+  end
+
+  # Just compatibility
+  alias_method :to_question, :question
+  alias_method :all_reviews, :reviews
+  alias_method :text, :answer
+  alias_method :uqid, :user_question_id
+end
+
+class UserReview < DBUserReview
+  def initialize(db_layer, reviewer_id, user_question_id)
+    db_review = db_layer.reviews.assign_reviewer(reviewer_id, user_question_id)
+    super(db_review.id, db_review.reviewer_id, db_review.user_question_id)
+    @db = db_layer
+  end
+
+  # Для совместимости
+  alias_method :userid, :reviewer_id
+  alias_method :userquestionid, :user_question_id
+
+  def to_s
+    <<~TEXT.chomp
+      UserReview #{id}:
+      \tReviewer: #{reviewer_id}
+      \tUserQuestion: #{user_question_id}
+    TEXT
   end
 end
 
-class Answer
-  attr_reader :id, :uqid, :text
+class Review < DBReview
+  def initialize(db_layer, review_assignment_id, grade = nil, text = nil)
+    @db = db_layer
+    
+    db_review = if grade && text
+                  @db.reviews.submit(review_assignment_id, grade, text)
+                else
+                  @db.reviews.find_by_assignment(review_assignment_id) ||
+                  raise("Review not found for assignment #{review_assignment_id}")
+                end
 
-  def initialize(dbl, uqid, text = nil)
-    @dbl = dbl
-    @uqid = uqid
-
-    if text
-      create_answer(text)
-    else
-      load_answer
-    end
-  end
-
-  def to_question
-    uqrecord = @dbl.awid_to_userquestion(@id)
-
-    if uqrecord
-      examid, uid, qid = uqrecord 
-      userquestion = UserQuestion.new @dbl, examid, uid, qid      
-    else
-      raise DBLayerError, 'tried to get unregistered answer'
-    end
-
-    userquestion.to_question
-  end
-
-  def all_reviews
-    @dbl.allreviews(@uqid)
+    # Инициализируем родительский класс
+    super(db_review.id, db_review.user_review_id, db_review.grade, db_review.review)
   end
 
   def to_s
-    <<~ANSWER.chomp
-      Answer: #{@id}
-      \tUserQuestionId: #{@uqid}
-      \tText: #{@text}
-    ANSWER
+    <<~TEXT.chomp
+      Review #{id}:
+      \tAssignment: #{user_review_id}
+      \tGrade: #{grade}
+      \tText: #{review}
+    TEXT
   end
 
-  private
-
-  def create_answer(text)
-    @id = @dbl.record_answer(@uqid, text)
-    @text = text
-  end
-
-  def load_answer
-    answer = @dbl.uqid_to_answer(@uqid)
-    if answer
-      @id, @uqid, @text = answer
-    else
-      raise DBLayerError, 'tried to get unregistered answer'
-    end
-  end
-end
-
-class UserReview
-  attr_reader :id, :userid, :userquestionid
-
-  def initialize(dbl, userid, userquestionid)
-    @dbl = dbl
-    @userid = userid
-    @userquestionid = userquestionid
-    @id = dbl.create_review_assignment(userid, userquestionid)
-  end
-
-  def to_s
-    <<~USERREVIEW
-      User review: #{@id}
-      \tUserId: #{@userid}
-      \tUserQuestionId: #{@userquestionid}
-    USERREVIEW
-  end
-end
-
-class Review
-  attr_reader :id, :revid, :grade, :text
-
-  def initialize(dbl, revid, grade = nil, text = nil)
-    @dbl = dbl
-    @revid = revid
-
-    if grade && text
-      @grade = grade
-      @text = text
-      @id = @dbl.record_review(revid, grade, text)
-    else
-      review = dbl.query_review(revid)
-      raise DBLayerError, "unregistered review" unless review
-
-      @id, @revid, @grade, @text = review
-    end
-  end
-
-  def to_s
-    <<~REVIEW
-      User review: #{@id}
-      \tReviewId: #{@revid}
-      \tGrade: #{@grade}
-      \tText: #{@text}
-    REVIEW
-  end
+  alias_method :revid, :user_review_id
+  alias_method :text, :review
 end

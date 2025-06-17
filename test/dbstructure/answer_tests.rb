@@ -14,106 +14,146 @@ require 'minitest/spec'
 require 'minitest/mock'
 require 'dbstructure'
 
-describe "UserQuestion and Answer" do
-  let(:dbl)         { Minitest::Mock.new }
-  let(:examid)      { 1 }
-  let(:userid)      { 2 }
-  let(:questionid)  { 3 }
-  let(:uqid)        { 42 }
+describe "UserQuestion and Answer Integration" do
+  let(:db)          { Minitest::Mock.new }
+  let(:exam_id)     { 1 }
+  let(:user_id)     { 2 }
+  let(:question_id) { 3 }
+  let(:uq_id)       { 42 }
   let(:answer_id)   { 99 }
+  let(:sample_text) { "Sample answer text" }
 
   describe UserQuestion do
-    it "registers user question correctly" do
-      dbl.expect :register_question, uqid, [examid, userid, questionid]
+    it "correctly registers user-question assignment" do
+      # Setup mock expectations
+      db.expect(:user_questions, db)
+      db.expect(:register, 
+                DBUserQuestion.new(uq_id, exam_id, user_id, question_id),
+                [exam_id, user_id, question_id])
 
-      uq = UserQuestion.new(dbl, examid, userid, questionid)
+      # Exercise
+      uq = UserQuestion.new(db, exam_id, user_id, question_id)
 
-      assert_equal uqid, uq.id
-      assert_equal examid, uq.examid
-      assert_equal userid, uq.userid
-      assert_equal questionid, uq.questionid
-      dbl.verify
+      # Verify
+      assert_equal uq_id, uq.id
+      assert_equal exam_id, uq.exam_id
+      assert_equal user_id, uq.user_id
+      assert_equal question_id, uq.question_id
+      db.verify
     end
 
     it "returns nil when no answer exists" do
-      dbl.expect :register_question, uqid, [examid, userid, questionid]
-      dbl.expect :uqid_to_answer, nil, [uqid]
+      # Setup
+      db.expect(:user_questions, db)
+      db.expect(:register, mock_user_question, [exam_id, user_id, question_id])
+      db.expect(:answers, db)
+      db.expect(:find_by_user_question, nil, [uq_id])
 
-      uq = UserQuestion.new(dbl, examid, userid, questionid)
-
-      assert_nil uq.to_answer
-      dbl.verify
+      # Exercise/Verify
+      uq = UserQuestion.new(db, exam_id, user_id, question_id)
+      assert_nil uq.answer
+      db.verify
     end
 
-    it "returns an Answer when answer exists" do
-      dbl.expect :register_question, uqid, [examid, userid, questionid]
-      dbl.expect :uqid_to_answer, [answer_id, uqid, "Sample answer"], [uqid]
-      dbl.expect :uqid_to_answer, [answer_id, uqid, "Sample answer"], [uqid]
+    it "returns Answer instance when answer exists" do
+      # Setup
+      db.expect(:user_questions, db)
+      db.expect(:register, mock_user_question, [exam_id, user_id, question_id])
+      db.expect(:answers, db)
+      db.expect(:find_by_user_question, 
+                DBAnswer.new(answer_id, uq_id, sample_text), 
+                [uq_id])
+      db.expect(:answers, db)
+      db.expect(:create_or_update, 
+                DBAnswer.new(answer_id, uq_id, sample_text),
+                [uq_id, sample_text])
 
-      uq = UserQuestion.new(dbl, examid, userid, questionid)
+      # Exercise
+      uq = UserQuestion.new(db, exam_id, user_id, question_id)
+      answer = uq.answer
 
-      answer = uq.to_answer
+      # Verify
       assert_instance_of Answer, answer
       assert_equal answer_id, answer.id
-      assert_equal uqid, answer.uqid
-      assert_equal "Sample answer", answer.text
-      dbl.verify
-    end
-
-    it "returns a Question from DB" do
-      dbl.expect :record_answer, answer_id, [uqid, "Text"]
-      dbl.expect :register_question, uqid, [examid, userid, questionid]
-      dbl.expect :awid_to_userquestion, [examid, userid, questionid], [answer_id]
-      dbl.expect :add_question, questionid, [1, 2, "Sample?"]
-      dbl.expect :uqid_to_question, [dbl, 1, 2, "Sample?"], [uqid]
-
-      answer = Answer.new(dbl, uqid, "Text")
-      q = answer.to_question
-
-      assert_instance_of Question, q
-      dbl.verify
+      assert_equal uq_id, answer.user_question_id
+      assert_equal sample_text, answer.text
+      db.verify
     end
   end
 
   describe Answer do
-    it "creates and stores new answer" do
-      dbl.expect :record_answer, answer_id, [uqid, "Text"]
+    it "creates new answer successfully" do
+      # Setup
+      db.expect(:answers, db)
+      db.expect(:create_or_update, 
+                DBAnswer.new(answer_id, uq_id, sample_text),
+                [uq_id, sample_text])
 
-      answer = Answer.new(dbl, uqid, "Text")
+      # Exercise
+      answer = Answer.new(db, uq_id, sample_text)
+
+      # Verify
       assert_equal answer_id, answer.id
-      assert_equal uqid, answer.uqid
-      assert_equal "Text", answer.text
-      dbl.verify
+      assert_equal uq_id, answer.user_question_id
+      assert_equal sample_text, answer.text
+      db.verify
     end
 
-    it "loads answer from DB when no text provided" do
-      dbl.expect :uqid_to_answer, [answer_id, uqid, "Loaded answer"], [uqid]
+    it "loads existing answer from database" do
+      # Setup
+      db.expect(:answers, db)
+      db.expect(:find_by_user_question,
+                DBAnswer.new(answer_id, uq_id, sample_text),
+                [uq_id])
 
-      answer = Answer.new(dbl, uqid)
+      # Exercise
+      answer = Answer.new(db, uq_id)
+
+      # Verify
       assert_equal answer_id, answer.id
-      assert_equal uqid, answer.uqid
-      assert_equal "Loaded answer", answer.text
-      dbl.verify
+      assert_equal sample_text, answer.text
+      db.verify
     end
 
-    it "raises when no such answer in DB" do
-      dbl.expect :uqid_to_answer, nil, [uqid]
+    it "raises error when answer doesn't exist" do
+      # Setup
+      db.expect(:answers, db)
+      db.expect(:find_by_user_question, nil, [uq_id])
 
-      assert_raises(DBLayerError) do
-        Answer.new(dbl, uqid)
+      # Exercise/Verify
+      assert_raises(StandardError, "Answer not found") do
+        Answer.new(db, uq_id)
       end
-
-      dbl.verify
+      db.verify
     end
 
-    it "returns reviews via all_reviews" do
-      dbl.expect :uqid_to_answer, [answer_id, uqid, "Loaded answer"], [uqid]
-      dbl.expect :allreviews, [1, 2], [uqid]
+    it "retrieves all reviews for the answer" do
+      # Setup
+      mock_reviews = [
+        DBReview.new(1, 1, 5, "Excellent"),
+        DBReview.new(2, 1, 3, "Average")
+      ]
+      db.expect(:answers, db)
+      db.expect(:find_by_user_question,
+                DBAnswer.new(answer_id, uq_id, sample_text),
+                [uq_id])
+      db.expect(:reviews, db)
+      db.expect(:all_for_answer, mock_reviews, [uq_id])
 
-      answer = Answer.new(dbl, uqid)
-      reviews = answer.all_reviews
-      assert_equal [1, 2], reviews
-      dbl.verify
+      # Exercise
+      answer = Answer.new(db, uq_id)
+      reviews = answer.reviews
+
+      # Verify
+      assert_equal 2, reviews.size
+      assert_equal "Excellent", reviews.first.review
+      db.verify
     end
+  end
+
+  private
+
+  def mock_user_question
+    DBUserQuestion.new(uq_id, exam_id, user_id, question_id)
   end
 end

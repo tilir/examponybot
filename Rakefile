@@ -1,3 +1,4 @@
+require 'find'
 require 'rake/testtask'
 
 test_files = [
@@ -16,6 +17,43 @@ test_files = [
 Rake::TestTask.new(:test) do |t|
   t.libs << 'lib' << 'test' << 'test/dbstructure'
   t.test_files = test_files
+end
+
+# to run like:
+# > rake group['UserQuestion and Answer Integration']
+task :group, [:group_name] do |t, args|
+  require 'find'
+  
+  group_name = args[:group_name]
+  unless group_name
+    puts "Usage: rake test:by_group['Group Name']"
+    exit
+  end
+
+  puts "Searching for test group: #{group_name}"
+
+  test_files = []
+  Find.find('test') do |path|
+    next unless path.end_with?('.rb') && File.file?(path)
+    
+    content = File.read(path)
+    if content.include?(group_name)
+      test_files << path 
+      puts "Found in: #{path}"
+    end
+  end
+
+  # puts "File content:\n#{File.read(test_files[0])}" if test_files.any?
+
+  if test_files.empty?
+    puts "Error: Test group '#{group_name}' not found".red
+    exit 1
+  end
+
+  test_files.each do |file|
+    puts "\nRunning tests from #{file}:"
+    system("bundle exec rake test TEST=#{file} TESTOPTS=\"--verbose --name='/#{group_name}/'\"")
+  end
 end
 
 task default: :test

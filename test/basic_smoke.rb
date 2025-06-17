@@ -14,23 +14,37 @@ require 'pseudoapi'
 require 'test_helper'
 require 'importer'
 
-# set to true for lots of debug output
+# Configure once at the beginning (disable for clean test output)
 Logger.set_verbose(false)
 
-describe "PonyBot register privileged" do
-  before { setup_test_env }
-  after { cleanup_test_env }
+describe "Privileged User Registration" do
+  before do
+    setup_test_env
+  end
 
-  it "basic privileged user registers correct " do
-    assert @dbl.users_empty?, "Expected user DB to be empty before registration"
-    register_privuser
-    refute @dbl.users_empty?, "Expected user DB to contain the registered user"
-    assert_empty @dbl.all_nonpriv_users, "No non-priv-users expected at this point"
+  after do
+    cleanup_test_env
+  end
+
+  it "successfully registers admin user" do
+    # Check initial empty state
+    assert @dbl.users.empty?, "User table should be empty initially"
+    
+    # Simulate registration command
+    register_msg = PseudoMessage.new(@prepod, @chat, '/register')
+    @handler.process_message(@api, register_msg)
+
+    # Verify database state
+    refute @dbl.users.empty?, "User should be added to database"
+    user = User.from_db_user(@dbl, @dbl.users.get_user_by_id(167346988))
+    assert user.privileged?, "User should have privileged status"
+    
+    # Verify bot response
     assert_equal "167346988 : Registered (privileged) as Tilir", @api.text
   end
 end
 
-describe "PonyBot create start and stop exam" do
+describe "Exam Management Workflow" do
   before do
     setup_test_env
     register_privuser
@@ -40,14 +54,16 @@ describe "PonyBot create start and stop exam" do
     cleanup_test_env
   end
 
-  it "adding exam" do
-    event = PseudoMessage.new(@prepod, @chat, '/addexam')
-    @handler.process_message(@api, event)
+  it "creates exam and imports questions successfully" do
+    # Test exam creation
+    exam_msg = PseudoMessage.new(@prepod, @chat, '/addexam Final Exam')
+    @handler.process_message(@api, exam_msg)
+    
     assert_equal "167346988 : Exam added", @api.text
-    refute @dbl.exams_empty?
+    refute @dbl.exams.empty?, "Exam should be created in database"
 
+    # import exam
     exam_path = File.expand_path("example_exam.txt", __dir__)
-
     importer = QuestionImporter.new(
       filename: exam_path,
       handler: @handler,
@@ -57,9 +73,8 @@ describe "PonyBot create start and stop exam" do
     )
     importer.import!
 
-    assert_equal 3, @dbl.n_questions
-    assert_equal 3, @dbl.n_variants
+    # Verify imported questions
+    assert_equal 3, @dbl.questions.n_questions, "Should import all 3 questions"
+    assert_equal 3, @dbl.questions.n_variants, "Should support 3 variants"
   end
 end
-
-

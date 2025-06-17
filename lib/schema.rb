@@ -13,8 +13,7 @@ class DBLayerError < StandardError
 end
 
 module Schema
-  def create_schema(db_layer)
-    db = db_layer.instance_variable_get(:@db)
+  def create_schema(db)    
     db.execute_batch <<-SQL
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY,
@@ -27,7 +26,8 @@ module Schema
       id INTEGER PRIMARY KEY,
       number INTEGER,
       variant INTEGER,
-      question TEXT
+      question TEXT,
+      UNIQUE(number, variant) ON CONFLICT REPLACE
     );
 
     CREATE TABLE IF NOT EXISTS exams (
@@ -64,3 +64,106 @@ module Schema
     SQL
   end
 end
+
+class DBUser
+  attr_reader :id, :userid, :username, :privlevel
+
+  def initialize(id, userid, username, privlevel)
+    @id = id
+    @userid = userid
+    @username = username
+    @privlevel = privlevel
+  end
+
+  def self.from_db_row(row)
+    new(row[0], row[1], row[2], row[3])
+  end
+end
+
+class DBQuestion
+  attr_reader :id, :number, :variant, :question
+
+  def initialize(id, number, variant, question)
+    @id = id
+    @number = number
+    @variant = variant
+    @question = question
+  end
+
+  def self.from_db_row(row)
+    new(row[0], row[1], row[2], row[3])
+  end
+end
+
+class DBExam
+  attr_reader :id, :state, :name
+
+  def initialize(id, state, name)
+    @id = id
+    @state = state
+    @name = name
+  end
+
+  def self.from_db_row(row)
+    new(row[0], row[1], row[2])
+  end
+end
+
+class DBUserQuestion
+  attr_reader :id, :exam_id, :user_id, :question_id
+
+  def initialize(id, exam_id, user_id, question_id)
+    @id = id
+    @exam_id = exam_id
+    @user_id = user_id
+    @question_id = question_id
+  end
+
+  def self.from_db_row(row)
+    new(row[0], row[1], row[2], row[3])
+  end
+end
+
+class DBAnswer
+  attr_reader :id, :user_question_id, :answer
+
+  def initialize(id, user_question_id, answer)
+    @id = id
+    @user_question_id = user_question_id
+    @answer = answer
+  end
+
+  def self.from_db_row(row)
+    new(row[0], row[1], row[2])
+  end
+end
+
+class DBUserReview
+  attr_reader :id, :reviewer_id, :user_question_id
+
+  def initialize(id, reviewer_id, user_question_id)
+    @id = id
+    @reviewer_id = reviewer_id
+    @user_question_id = user_question_id
+  end
+
+  def self.from_db_row(row)
+    new(row[0], row[1], row[2])
+  end
+end
+
+class DBReview
+  attr_reader :id, :user_review_id, :grade, :review
+
+  def initialize(id, user_review_id, grade, review)
+    @id = id
+    @user_review_id = user_review_id
+    @grade = grade
+    @review = review
+  end
+
+  def self.from_db_row(row)
+    new(row[0], row[1], row[2], row[3])
+  end
+end
+

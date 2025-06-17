@@ -16,7 +16,7 @@ require 'pseudoapi'
 
 Minitest::Reporters.use! Minitest::Reporters::SpecReporter.new
 
-DB_PATH = 'test.db'.freeze
+DB_PATH = 'smoke.db'.freeze
 
 module PonyBotTestHelper
   def setup_test_env

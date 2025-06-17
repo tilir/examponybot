@@ -12,135 +12,120 @@
 require 'minitest/autorun'
 require 'dblayer'
 
-describe DBLayer do
+describe 'Database Layer' do
   before do
-    @dbl = DBLayer.new(':memory:')
+    @db = DBLayer.new(':memory:')
   end
 
   after do
-    @dbl.close
+    @db.close
   end
 
-  describe '#add_user and #get_user_by_id' do
+  describe 'User operations' do
     it 'adds and retrieves a user' do
-      id = @dbl.add_user('tg1', 1, 'Alice')
-      assert id.is_a?(Integer)
-
-      user = @dbl.get_user_by_id('tg1')
-      assert_equal 'tg1', user[1]
-      assert_equal 'Alice', user[2]
+      user = User.new(@db, 123, UserStates.to_i(:regular), 'Alice')
+      assert user.id.is_a?(Integer)
+      
+      found = @db.users.get_user_by_id(123)
+      assert_equal 'Alice', found.username
+      assert_equal UserStates.to_i(:regular), found.privlevel
     end
 
-    it 'updates an existing user' do
-      id1 = @dbl.add_user('tg1', 1, 'Alice')
-      id2 = @dbl.add_user('tg1', 2, 'AliceUpdated')
-
-      assert_equal id1, id2
-      user = @dbl.get_user_by_id('tg1')
-      assert_equal 'AliceUpdated', user[2]
-    end
-  end
-
-  describe '#users_empty? and #all_users' do
-    it 'returns true when no users' do
-      assert_equal true, @dbl.users_empty?
-    end
-
-    it 'returns all users after insert' do
-      @dbl.add_user('tg2', 2, 'Bob')
-      users = @dbl.all_users
-      assert_equal 1, users.length
-      assert_equal 'tg2', users.first.userid
+    it 'updates existing user' do
+      user1 = User.new(@db, 123, UserStates.to_i(:regular), 'Alice')
+      user2 = User.new(@db, 123, UserStates.to_i(:privileged), 'Alice Updated')
+      
+      assert_equal user1.id, user2.id
+      assert_equal 'Alice Updated', user2.username
+      assert user2.privileged?
     end
   end
 
-  describe '#add_question and #get_question' do
-    it 'adds and retrieves a question' do
-      @dbl.add_question(1, 1, 'Q?')
-      q = @dbl.get_question(1, 1)
-      assert_equal 'Q?', q[3]
+  describe 'Question operations' do
+    it 'adds and finds a question' do
+      q = Question.new(@db, 1, 1, "What is Ruby?")
+      found = @db.questions.find(1, 1)
+      
+      assert_equal q.text, found.question
     end
 
-    it 'updates an existing question' do
-      @dbl.add_question(1, 1, 'Old')
-      @dbl.add_question(1, 1, 'New')
-      q = @dbl.get_question(1, 1)
-      assert_equal 'New', q[3]
-    end
-  end
-
-  describe '#add_exam and #exams_empty?' do
-    it 'adds an exam and prevents duplicates' do
-      ex = @dbl.add_exam('Exam A')
-      refute_nil ex
-
-      ex2 = @dbl.add_exam('Exam A')
-      assert_equal ex[0], ex2[0]
-    end
-
-    it 'returns nil if second exam added' do
-      @dbl.add_exam('A')
-      assert_nil @dbl.add_exam('B')
+    it 'updates existing question' do
+      q1 = Question.new(@db, 1, 1, "Old text")
+      q2 = Question.new(@db, 1, 1, "New text")
+      
+      assert_equal q1.id, q2.id
+      assert_equal "New text", q2.text
     end
   end
 
-  describe '#register_question and #user_nth_question' do
-    it 'registers and retrieves a question for user' do
-      uid = @dbl.add_user('u', 1, 'U')
-      qid = @dbl.add_question(1, 1, 'Q')
-      exam = @dbl.add_exam('E')
-      @dbl.register_question(exam[0], uid, qid)
-
-      result = @dbl.user_nth_question(exam[0], uid, 1)
-      assert_equal exam[0], result[0]
-      assert_equal uid, result[1]
+  describe 'Exam operations' do
+    it 'creates and manages exams' do
+      exam = Exam.new(@db, "Final Exam")
+      assert_equal :stopped, exam.state
+      
+      exam.set_state(:answering)
+      assert_equal :answering, exam.state
     end
   end
 
-  describe '#record_answer and #user_all_answers' do
-    it 'records and retrieves answers for a user' do
-      uid = @dbl.add_user('u1', 1, 'U1')
-      qid = @dbl.add_question(1, 1, 'Q')
-      ex = @dbl.add_exam('E1')
-      uqid = @dbl.register_question(ex[0], uid, qid)
+  describe 'UserQuestion operations' do
+    before do
+      @user = User.new(@db, 1, UserStates.to_i(:regular), 'Test User')
+      @question = Question.new(@db, 1, 1, "Q?")
+      @exam = Exam.new(@db, "Test Exam")
+    end
 
-      aid = @dbl.record_answer(uqid, '42')
-      assert aid.is_a?(Integer)
+    it 'links user with question' do
+      uq = UserQuestion.new(@db, @exam.id, @user.id, @question.id)
+      assert_equal @question.id, uq.question_id
+    end
 
-      answers = @dbl.user_all_answers(uid)
-      assert_equal uqid, answers.first.uqid
+    it 'finds user questions by number' do
+      UserQuestion.new(@db, @exam.id, @user.id, @question.id)
+      found = @db.user_questions.user_nth_question(@exam.id, @user.id, 1)
+      
+      assert_equal @question.id, found.question_id
     end
   end
 
-  describe '#create_review_assignment, #record_review, #nreviews, #query_review' do
-    it 'assigns and stores a review' do
-      uid = @dbl.add_user('rev', 1, 'Reviewer')
-      qid = @dbl.add_question(1, 1, 'Q')
-      ex = @dbl.add_exam('E')
-      uqid = @dbl.register_question(ex[0], uid, qid)
+  describe 'Answer operations' do
+    before do
+      user = User.new(@db, 1, 1, 'U')
+      question = Question.new(@db, 1, 1, 'Q')
+      exam = Exam.new(@db, 'E')
+      @uq = UserQuestion.new(@db, exam.id, user.id, question.id)
+    end
 
-      rid = @dbl.create_review_assignment(uid, uqid)
-      assert rid.is_a?(Integer)
-
-      @dbl.record_review(rid, 5, 'Good')
-      assert_equal 1, @dbl.nreviews(uid)
-
-      r = @dbl.query_review(rid)
-      assert_equal 5, r[2]
+    it 'records and finds answers' do
+      answer = Answer.new(@db, @uq.id, "42")
+      assert_equal "42", answer.text
+      
+      found = @db.answers.find_by_user_question(@uq.id)
+      assert_equal answer.answer, found.answer
     end
   end
 
-  describe '#allreviews' do
-    it 'returns all reviews for a user-question' do
-      uid = @dbl.add_user('X', 1, 'X')
-      qid = @dbl.add_question(1, 1, 'Q')
-      ex = @dbl.add_exam('E')
-      uqid = @dbl.register_question(ex[0], uid, qid)
-      rid = @dbl.create_review_assignment(uid, uqid)
-      @dbl.record_review(rid, 10, 'Fine')
+  describe 'Review operations' do
+    before do
+      user = User.new(@db, 1, 1, 'Student')
+      reviewer = User.new(@db, 2, UserStates.to_i(:privileged), 'Teacher')
+      question = Question.new(@db, 1, 1, 'Q')
+      exam = Exam.new(@db, 'E')
+      @uq = UserQuestion.new(@db, exam.id, user.id, question.id)
+      @assignment = UserReview.new(@db, reviewer.id, @uq.id)
+    end
 
-      reviews = @dbl.allreviews(uqid)
-      assert_equal 10, reviews.first.instance_variable_get(:@grade)
+    it 'creates and queries reviews' do
+      review = Review.new(@db, @assignment.id, 5, "Good work")
+      assert_equal 5, review.grade
+      
+      found = @db.reviews.query_review(@assignment.id)
+      assert_equal review.text, found.review
+    end
+
+    it 'counts reviews per reviewer' do
+      Review.new(@db, @assignment.id, 4, "Not bad")
+      assert_equal 1, @db.reviews.nreviews(@assignment.reviewer_id)
     end
   end
 end

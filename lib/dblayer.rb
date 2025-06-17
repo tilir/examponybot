@@ -29,369 +29,393 @@ class Logger
   end
 end
 
-def safe_sql
-  yield
-rescue SQLite3::Exception => e
-  puts "SQLite3 Error: #{e.class} - #{e.message}"
-  puts "Backtrace:"
-  e.backtrace.each { |line| puts "  #{line}" }
-  close if respond_to?(:close)
-  exit(1)
-end
-
 class DBLayer
   include Schema
-  attr_reader :name
 
   def initialize(dbname)
-    safe_sql do
-      @db = SQLite3::Database.new(dbname)
-      @name = dbname
-      create_schema(self)
-    end
+    @db = SQLite3::Database.new(dbname)
+    @db.results_as_hash = false
+    create_schema(@db)
+    initialize_managers
   end
 
-  def add_user(tguser, priv, name)
-    raise ArgumentError, 'tguser, priv и name не должны быть nil' if tguser.nil? || priv.nil? || name.nil?
-
-    safe_sql do
-      existing = @db.get_first_row('SELECT id FROM users WHERE userid = ?', [tguser])
-      
-      if existing.nil?
-        @db.execute('INSERT INTO users (userid, username, privlevel) VALUES (?, ?, ?)', [tguser, name, priv])
-        id = @db.last_insert_row_id
-      else
-        @db.execute('UPDATE users SET username = ? WHERE userid = ?', [name, tguser])
-        id = existing[0]
-      end
-
-      id
-    end
+  # Public interface for managers
+  def execute(query, *params)
+    safe_sql { @db.execute(query, params) }
   end
 
-  def get_user_by_id(userid)
-    safe_sql do
-      @db.get_first_row('SELECT id, userid, username, privlevel FROM users WHERE userid = ?', [userid])      
-    end
+  def get_first_row(query, *params)
+    safe_sql { @db.get_first_row(query, params) }
   end
 
-  def users_empty?
-    safe_sql do
-      rs = @db.execute('SELECT * FROM users')
-      Logger.print 'user table empty' if rs.empty?
-      rs.empty?
-    end
+  def get_first_value(query, *params)
+    safe_sql { @db.get_first_value(query, params) }
   end
 
-  private def collect_users(rs)
-    users = []
-    return users if rs.nil?
-
-    rs.each do |row|
-      Logger.print row
-      next if row[1].nil? or row[2].nil? or row[3].nil?
-
-      users.append User.new(self, row[1])
-    end
-    users
+  def transaction(&block)
+    safe_sql { @db.transaction(&block) }
   end
 
-  def all_users
-    safe_sql do
-      rs = @db.execute('SELECT * FROM users')
-      collect_users(rs)
-    end
-  end
-
-  def all_nonpriv_users
-    safe_sql do
-      rs = @db.execute('SELECT * FROM users WHERE privlevel = 1')
-      collect_users(rs)
-    end
-  end
-
-  def add_question(number, variant, question)
-    safe_sql do
-      rs = @db.get_first_row('SELECT * FROM questions WHERE number = ? AND variant = ?', [number, variant])
-      if rs.nil?
-        @db.execute('INSERT INTO questions (number, variant, question) VALUES (?, ?, ?)', [number, variant, question])
-        Logger.print "question #{number} #{variant} #{question} added"
-      else
-        @db.execute('UPDATE questions SET question = ? WHERE number = ? AND variant = ?', [question, number, variant])
-        Logger.print "question #{number} #{variant} #{question} updated"
-      end
-      rs = @db.get_first_row('SELECT * FROM questions WHERE number = ? AND variant = ?', [number, variant])
-      rs[0]
-    end
-  end
-
-  def all_questions
-    safe_sql do
-      questions = []
-      rs = @db.execute('SELECT * FROM questions')
-      rs.each do |row|
-        Logger.print row
-        next if row[1].nil? or row[2].nil? or row[3].nil?
-
-        questions.append Question.new(self, row[1], row[2])
-      end
-      questions
-    end
-  end
-
-  def get_question(number, variant)
-    safe_sql do
-      rs = @db.get_first_row('SELECT * FROM questions WHERE number = ? AND variant = ?', [number, variant])
-      return nil if rs.nil?
-
-      Logger.print "got question info: #{rs[1]} #{rs[2]} #{rs[3]}"
-      rs
-    end
-  end
-
-  def n_questions
-    safe_sql do
-      rs = @db.get_first_row('SELECT MAX(number) FROM questions')
-      rs[0]
-    end
-  end
-
-  def n_variants
-    safe_sql do
-      rs = @db.get_first_row('SELECT MAX(variant) FROM questions')
-      rs[0]
-    end
-  end
-
-  def exams_empty?
-    rs = @db.execute('SELECT * FROM exams')
-    rs.empty?
-  end
-
-  def add_exam(name)
-    safe_sql do
-      rs = @db.get_first_row('SELECT * FROM exams WHERE name = ?', [name])
-      if rs.nil?
-        if exams_empty?
-          @db.execute('INSERT INTO exams (state, name) VALUES (?, ?)', [0, name])
-          Logger.print 'exam added'
-          rs = @db.get_first_row('SELECT * FROM exams WHERE name = ?', [name])
-        else
-          Logger.print 'sorry only one exam supported'
-        end
-      else
-        Logger.print "exam #{name} already exists"
-      end
-      rs
-    end
-  end
-
-  def set_exam_state(name, state)
-    safe_sql do
-      rs = @db.get_first_row('SELECT * FROM exams WHERE name = ?', [name])
-      @db.execute('UPDATE exams SET state = ? WHERE id = ?', [state, rs[0]])
-    end
-  end
-
-  def register_question(eid, uid, qid)
-    safe_sql do
-      rs = @db.get_first_row('SELECT * FROM userquestions WHERE exam = ? AND user = ? AND question = ?', [eid, uid, qid])
-      if rs.nil?
-        @db.execute('INSERT INTO userquestions (exam, user, question) VALUES (?, ?, ?)', [eid, uid, qid])
-        Logger.print "question #{qid} linked with user #{uid}"
-        rs = @db.get_first_row('SELECT * FROM userquestions WHERE exam = ? AND user = ? AND question = ?',
-                               [eid, uid, qid])
-      else
-        Logger.print "question #{qid} link with user #{uid} already exists"
-      end
-      rs[0]
-    end
-  end
-
-  def user_nth_question(eid, uid, n)
-    safe_sql do
-      multiline = <<-SQL
-        SELECT userquestions.exam, userquestions.user, userquestions.question FROM userquestions
-        INNER JOIN questions ON userquestions.question = questions.id
-        WHERE userquestions.exam = ? AND userquestions.user = ? AND questions.number = ?
-      SQL
-      rs = @db.get_first_row("#{multiline}", [eid, uid, n])
-      rs
-    end
-  end
-
-  private def collect_answers(rs)
-    answers = []
-    return answers if rs.nil?
-
-    rs.each do |row|
-      Logger.print row
-      next if row[1].nil? or row[2].nil?
-
-      answers.append(Answer.new(self, row[1]))
-    end
-    answers
-  end
-
-  def user_all_answers(uid)
-    safe_sql do
-      multiline = <<-SQL
-        SELECT DISTINCT answers.* FROM userquestions
-        INNER JOIN answers ON userquestions.id = answers.uqid
-        WHERE userquestions.user = ?
-      SQL
-      rs = @db.execute(multiline, [uid])
-      collect_answers(rs)
-    end
-  end
-
-  def all_answered_users
-    safe_sql do
-      multiline = <<-SQL
-        SELECT DISTINCT users.* FROM userquestions
-        INNER JOIN users ON users.id = userquestions.user
-        INNER JOIN answers ON userquestions.id = answers.uqid
-      SQL
-      rs = @db.execute(multiline)
-      return nil if rs.nil?
-
-      collect_users(rs)
-    end
-  end
-
-  def record_answer(uqid, t)
-    safe_sql do
-      rs = @db.get_first_row('SELECT id FROM answers WHERE uqid = ?', [uqid])
-      if rs.nil?
-        @db.execute('INSERT INTO answers (uqid, answer) VALUES (?, ?)', [uqid, t])
-        Logger.print "answer #{t} recorded for #{uqid}"
-        rs = @db.get_first_row('SELECT id FROM answers WHERE uqid = ?', [uqid])
-      else
-        @db.execute('UPDATE answers SET answer = ? WHERE id = ?', [t, rs[0]])
-        Logger.print "answer #{t} updated for #{uqid}"
-      end
-      rs[0]
-    end
-  end
-
-  def uqid_to_answer(uqid)
-    safe_sql do
-      multiline = <<-SQL
-        SELECT answers.id, answers.uqid, answers.answer FROM answers
-        INNER JOIN userquestions ON userquestions.id = answers.uqid
-        WHERE userquestions.id = ?
-      SQL
-      @db.get_first_row(multiline, [uqid])
-    end
-  end
-
-  def awid_to_userquestion(awid)
-    safe_sql do
-      multiline = <<-SQL
-        SELECT userquestions.exam, userquestions.user, userquestions.question FROM userquestions
-        INNER JOIN answers ON userquestions.id = answers.uqid
-        WHERE answers.id = ?
-      SQL
-      @db.get_first_row(multiline, [awid])
-    end
-  end
-
-  def uqid_to_question(uqid)
-    safe_sql do
-      multiline = <<-SQL
-        SELECT DISTINCT * FROM questions
-        INNER JOIN userquestions ON questions.id = userquestions.question
-        WHERE userquestions.id = ?#{'      '}
-      SQL
-      @db.get_first_row(multiline, [uqid])
-    end
-  end
-
-  def nreviews(rid)
-    safe_sql do
-      multiline = <<-SQL
-        SELECT COUNT(reviews.id) FROM reviews
-        INNER JOIN userreviews ON reviews.revid = userreviews.id
-        WHERE userreviews.reviewer = ?;
-      SQL
-      rs = @db.get_first_row(multiline, [rid])
-      Logger.print "found #{rs[0]} reviews from #{rid}"
-      rs[0]
-    end
-  end
-
-  def create_review_assignment(rid, uqid)
-    safe_sql do
-      rs = @db.get_first_row('SELECT * FROM userreviews WHERE reviewer = ? AND uqid = ?', [rid, uqid])
-      if rs.nil?
-        @db.execute('INSERT INTO userreviews (reviewer, uqid) VALUES (?, ?)', [rid, uqid])
-        Logger.print "uqid #{uqid} linked with reviewer #{rid}"
-        rs = @db.get_first_row('SELECT * FROM userreviews WHERE reviewer = ? AND uqid = ?', [rid, uqid])
-      else
-        Logger.print "uqid #{uqid} link with reviewer #{rid} already exists"
-      end
-      rs[0]
-    end
-  end
-
-  # userreview.userquestionid
-  def urid_to_uqid(uid, rid)
-    safe_sql do
-      rs = @db.get_first_row('SELECT uqid FROM userreviews WHERE reviewer = ? AND id = ?', [uid, rid])
-      return nil if rs.nil?
-      rs[0]
-    end
-  end
-
-  def record_review(revid, grade, review)
-    safe_sql do
-      rs = @db.get_first_row('SELECT * FROM reviews WHERE revid = ?', [revid])
-      if rs.nil?
-        @db.execute('INSERT INTO reviews (revid, grade, review) VALUES (?, ?, ?)', [revid, grade, review])
-        Logger.print "review #{grade} #{review} created for #{revid} assignment"
-      else
-        @db.execute('UPDATE reviews SET grade = ?, review = ? WHERE revid = ?', [grade, review, revid])
-        Logger.print "review #{grade} #{review} updated for #{revid} assignment"
-      end
-      rs = @db.get_first_row('SELECT * FROM reviews WHERE revid = ?', [revid])
-      rs[0]
-    end
-  end
-
-  def query_review(revid)
-    safe_sql do
-      @db.get_first_row('SELECT * FROM reviews WHERE revid = ?', [revid])
-    end
-  end
-
-  private def collect_reviews(rs)
-    safe_sql do
-      reviews = []
-      return reviews if rs.nil?
-
-      rs.each do |row|
-        Logger.print row
-        next if row[1].nil? || row[2].nil? || row[3].nil?
-
-        reviews.append Review.new(self, row[1], row[2], row[3])
-      end
-      reviews
-    end
-  end
-
-  def allreviews(uqid)
-    safe_sql do
-      multiline = <<-SQL
-        SELECT * FROM reviews
-        INNER JOIN userreviews ON reviews.revid = userreviews.id
-        WHERE userreviews.uqid = ?;
-      SQL
-      rs = @db.execute(multiline, [uqid])
-      collect_reviews(rs)
-    end
-  end
+  # Access to managers
+  attr_reader :users, :questions, :exams, :user_questions, :answers, :reviews
 
   def close
     @db.close if @db
   end
+
+  private
+
+  def initialize_managers
+    @users = UserManager.new(self)
+    @questions = QuestionManager.new(self)
+    @exams = ExamManager.new(self)
+    @user_questions = UserQuestionManager.new(self)
+    @answers = AnswerManager.new(self)
+    @reviews = ReviewManager.new(self)
+  end
+
+  def safe_sql
+    yield
+  rescue SQLite3::Exception => e
+    Logger.print "SQL Error: #{e.message}"
+    Logger.print "Query: #{e.query}" if e.respond_to?(:query)
+    raise DBLayerError, "Database operation failed"
+  end
+end
+
+class UserManager
+  def initialize(db_layer)
+    raise ArgumentError, 'DB layer cannot be nil' if db_layer.nil?
+    @db = db_layer
+  end
+  
+  def add_user(tguser, priv, name)
+    raise ArgumentError, 'tguser, priv and name must not be nil' if tguser.nil? || priv.nil? || name.nil?
+    
+    # First, check if the user already exists
+    existing = get_user_by_id(tguser)
+    
+    if existing
+      # Update the existing record
+      @db.execute(
+        'UPDATE users SET username = ?, privlevel = ? WHERE userid = ?',
+        name, priv, tguser
+      )
+    else
+      # Create a new user
+      @db.execute(
+        'INSERT INTO users (userid, username, privlevel) VALUES (?, ?, ?)',
+        tguser, name, priv
+      )
+    end
+    
+    get_user_by_id(tguser)
+  end
+  
+  def get_user_by_id(userid)
+    row = @db.get_first_row(
+      'SELECT id, userid, username, privlevel FROM users WHERE userid = ?', 
+      userid
+    )
+    row.nil? ? nil : DBUser.from_db_row(row)
+  end
+  
+  def users_empty?
+    rs = @db.execute('SELECT * FROM users')
+    Logger.print 'user table empty' if rs.empty?
+    rs.empty?
+  end
+  
+  def all_users
+    @db.execute('SELECT id, userid, username, privlevel FROM users')
+      .map { |row| DBUser.from_db_row(row) }
+  end
+  
+  def all_nonpriv_users
+    @db.execute('SELECT id, userid, username, privlevel FROM users WHERE privlevel = 1')
+      .map { |row| DBUser.from_db_row(row) }
+  end
+
+  alias_method :all, :all_users
+  alias_method :all_nonpriv, :all_nonpriv_users
+  alias_method :empty?, :users_empty?
+end
+
+class QuestionManager
+  def initialize(db_layer)
+    raise ArgumentError, 'DB layer cannot be nil' if db_layer.nil?
+    @db = db_layer
+  end
+  
+  def add_question(number, variant, question)
+    # First check if question exists
+    exists = @db.get_first_value(
+      'SELECT 1 FROM questions WHERE number = ? AND variant = ?',
+      number, variant
+    )
+
+    if exists
+      @db.execute(
+        'UPDATE questions SET question = ? WHERE number = ? AND variant = ?',
+        question, number, variant
+      )
+      Logger.print "Question #{number} variant #{variant} updated: #{question}"
+    else
+      @db.execute(
+        'INSERT INTO questions (number, variant, question) VALUES (?, ?, ?)',
+        number, variant, question
+      )
+      Logger.print "Question #{number} variant #{variant} added: #{question}"
+    end
+
+    # Return the current state
+    get_question(number, variant)    
+  end
+  
+  def all_questions
+    @db.execute('SELECT id, number, variant, question FROM questions')
+      .map { |row| DBQuestion.from_db_row(row) }
+  end
+  
+  def get_question(number, variant)
+    row = @db.get_first_row(
+      'SELECT id, number, variant, question FROM questions WHERE number = ? AND variant = ?',
+      number, variant
+    )
+    row.nil? ? nil : DBQuestion.from_db_row(row)
+  end
+  
+  def n_questions
+    @db.get_first_value('SELECT MAX(number) FROM questions')
+  end
+  
+  def n_variants
+    @db.get_first_value('SELECT MAX(variant) FROM questions')
+  end
+
+  alias_method :find, :get_question
+  alias_method :add, :add_question
+end
+
+class ExamManager
+  def initialize(db_layer)
+    raise ArgumentError, 'DB layer cannot be nil' if db_layer.nil?
+    @db = db_layer
+  end
+  
+  def exams_empty?
+    @db.get_first_value('SELECT COUNT(*) FROM exams') == 0
+  end
+  
+  def add_exam(name)
+    if exams_empty?
+      @db.execute('INSERT INTO exams (state, name) VALUES (?, ?)', 0, name)
+      Logger.print 'exam added'
+      row = @db.get_first_row('SELECT id, state, name FROM exams WHERE name = ?', name)
+      DBExam.from_db_row(row)
+    else
+      Logger.print 'sorry only one exam supported'
+      nil
+    end
+  end
+  
+  def set_exam_state(name, state)
+    row = @db.get_first_row('SELECT id FROM exams WHERE name = ?', name)
+    return nil if row.nil?
+    
+    @db.execute('UPDATE exams SET state = ? WHERE id = ?', state, row[0])
+    row = @db.get_first_row('SELECT id, state, name FROM exams WHERE id = ?', row[0])
+    DBExam.from_db_row(row)
+  end
+
+  alias_method :empty?, :exams_empty?
+end
+
+class UserQuestionManager
+  def initialize(db_layer)
+    raise ArgumentError, 'DB layer cannot be nil' if db_layer.nil?
+    @db = db_layer
+  end
+
+  def register_question(eid, uid, qid)
+    row = @db.get_first_row(
+      'SELECT id FROM userquestions WHERE exam = ? AND user = ? AND question = ?',
+      eid, uid, qid
+    )
+    
+    if row.nil?
+      @db.execute('INSERT INTO userquestions (exam, user, question) VALUES (?, ?, ?)', eid, uid, qid)
+      Logger.print "question #{qid} linked with user #{uid}"
+      row = @db.get_first_row(
+        'SELECT id, exam, user, question FROM userquestions WHERE exam = ? AND user = ? AND question = ?',
+        eid, uid, qid
+      )
+    else
+      Logger.print "question #{qid} link with user #{uid} already exists"
+      row = @db.get_first_row('SELECT id, exam, user, question FROM userquestions WHERE id = ?', row[0])
+    end
+    
+    DBUserQuestion.from_db_row(row)
+  end
+
+  def user_nth_question(eid, uid, n)
+    row = @db.get_first_row('SELECT id FROM questions WHERE number = ?', n)
+    return nil if row.nil?
+    
+    qid = row[0]
+    row = @db.get_first_row(
+      'SELECT id, exam, user, question FROM userquestions WHERE exam = ? AND user = ? AND question = ?',
+      eid, uid, qid
+    )
+    row.nil? ? nil : DBUserQuestion.from_db_row(row)
+  end
+
+  alias_method :register, :register_question
+end
+
+class AnswerManager
+  def initialize(db_layer)
+    raise ArgumentError, 'DB layer cannot be nil' if db_layer.nil?
+    @db = db_layer
+  end
+
+  def record_answer(uqid, t)
+    row = @db.get_first_row('SELECT id FROM answers WHERE uqid = ?', uqid)
+    
+    if row.nil?
+      @db.execute('INSERT INTO answers (uqid, answer) VALUES (?, ?)', uqid, t)
+      Logger.print "answer #{t} recorded for #{uqid}"
+      row = @db.get_first_row('SELECT id, uqid, answer FROM answers WHERE uqid = ?', uqid)
+    else
+      @db.execute('UPDATE answers SET answer = ? WHERE id = ?', t, row[0])
+      Logger.print "answer #{t} updated for #{uqid}"
+      row = @db.get_first_row('SELECT id, uqid, answer FROM answers WHERE id = ?', row[0])
+    end
+    
+    DBAnswer.from_db_row(row)
+  end
+
+  def uqid_to_answer(uqid)
+    row = @db.get_first_row('SELECT id, uqid, answer FROM answers WHERE uqid = ?', uqid)
+    row.nil? ? nil : DBAnswer.from_db_row(row)
+  end
+
+  def awid_to_userquestion(awid)
+    row = @db.get_first_row('SELECT uqid FROM answers WHERE id = ?', awid)
+    return nil if row.nil?
+    
+    row = @db.get_first_row('SELECT exam, user, question FROM userquestions WHERE id = ?', row[0])
+    DBUserQuestion.from_db_row(row)
+  end
+
+  def uqid_to_question(uqid)
+    row = @db.get_first_row('SELECT question FROM userquestions WHERE id = ?', uqid)
+    return nil if row.nil?
+    
+    row = @db.get_first_row('SELECT id, number, variant, question FROM questions WHERE id = ?', row[0])
+    DBQuestion.from_db_row(row)
+  end
+
+  def user_all_answers(uid)
+    query = <<-SQL
+      SELECT answers.* FROM userquestions
+      INNER JOIN answers ON userquestions.id = answers.uqid
+      WHERE userquestions.user = ?
+    SQL
+    @db.execute(query, uid).map { |row| DBAnswer.from_db_row(row) }
+  end
+
+  def all_answered_users
+    query = <<-SQL
+      SELECT DISTINCT users.* FROM userquestions
+      INNER JOIN users ON users.id = userquestions.user
+      INNER JOIN answers ON userquestions.id = answers.uqid
+    SQL
+    @db.execute(query).map { |row| DBUser.from_db_row(row) }
+  end
+
+  alias_method :create_or_update, :record_answer
+  alias_method :find_by_user_question, :uqid_to_answer
+end
+
+class ReviewManager
+  def initialize(db_layer)
+    raise ArgumentError, 'DB layer cannot be nil' if db_layer.nil?
+    @db = db_layer
+  end
+
+  def nreviews(rid)
+    query = <<-SQL
+      SELECT COUNT(reviews.id) 
+      FROM reviews 
+      INNER JOIN userreviews ON reviews.revid = userreviews.id 
+      WHERE userreviews.reviewer = ?
+    SQL
+    @db.get_first_value(query, rid)
+  end
+
+  def create_review_assignment(rid, uqid)
+    row = @db.get_first_row(
+      'SELECT id FROM userreviews WHERE reviewer = ? AND uqid = ?',
+      rid, uqid
+    )
+    
+    if row.nil?
+      @db.execute('INSERT INTO userreviews (reviewer, uqid) VALUES (?, ?)', rid, uqid)
+      Logger.print "uqid #{uqid} linked with reviewer #{rid}"
+      row = @db.get_first_row(
+        'SELECT id, reviewer, uqid FROM userreviews WHERE reviewer = ? AND uqid = ?',
+        rid, uqid
+      )
+    else
+      Logger.print "uqid #{uqid} link with reviewer #{rid} already exists"
+      row = @db.get_first_row('SELECT id, reviewer, uqid FROM userreviews WHERE id = ?', row[0])
+    end
+    
+    DBUserReview.from_db_row(row)
+  end
+
+  def urid_to_uqid(uid, rid)
+    row = @db.get_first_row(
+      'SELECT uqid FROM userreviews WHERE reviewer = ? AND id = ?',
+      uid, rid
+    )
+    row.nil? ? nil : row[0]
+  end
+
+  def record_review(revid, grade, review)
+    row = @db.get_first_row('SELECT id FROM reviews WHERE revid = ?', revid)
+    
+    if row.nil?
+      @db.execute('INSERT INTO reviews (revid, grade, review) VALUES (?, ?, ?)', revid, grade, review)
+      Logger.print "review #{grade} #{review} created for #{revid} assignment"
+      row = @db.get_first_row('SELECT id, revid, grade, review FROM reviews WHERE revid = ?', revid)
+    else
+      @db.execute('UPDATE reviews SET grade = ?, review = ? WHERE revid = ?', grade, review, revid)
+      Logger.print "review #{grade} #{review} updated for #{revid} assignment"
+      row = @db.get_first_row('SELECT id, revid, grade, review FROM reviews WHERE id = ?', row[0])
+    end
+    
+    DBReview.from_db_row(row)
+  end
+
+  def query_review(revid)
+    row = @db.get_first_row(
+      'SELECT id, revid, grade, review FROM reviews WHERE revid = ?',
+      revid
+    )
+    row.nil? ? nil : DBReview.from_db_row(row)
+  end
+
+  def allreviews(uqid)
+    query = <<-SQL
+      SELECT reviews.* FROM reviews
+      INNER JOIN userreviews ON reviews.revid = userreviews.id
+      WHERE userreviews.uqid = ?
+    SQL
+    @db.execute(query, uqid).map { |row| DBReview.from_db_row(row) }
+  end
+
+  alias_method :assign_reviewer, :create_review_assignment
+  alias_method :submit, :record_review
 end

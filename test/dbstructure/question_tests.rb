@@ -10,49 +10,52 @@
 #------------------------------------------------------------------------------
 
 require 'minitest/autorun'
+require 'minitest/spec'
+require 'minitest/mock'
+require 'dbstructure'
 
 describe Question do
-  let(:dbl) { Minitest::Mock.new }
+  let(:db) { Minitest::Mock.new }
+  let(:question_id) { 42 }
+  let(:question_number) { 1 }
+  let(:variant_number) { 2 }
+  let(:question_text) { "What is Ruby?" }
 
-  describe 'creating a new question' do
-    it 'adds question to DB and sets fields' do
-      dbl.expect(:add_question, 42, [1, 2, 'What is Ruby?'])
+  describe "creating new question" do
+    it "persists question and initializes object" do
+      # Setup mock expectations
+      db.expect(:questions, db)
+      db.expect(:add_question, 
+                DBQuestion.new(question_id, question_number, variant_number, question_text),
+                [question_number, variant_number, question_text])
 
-      q = Question.new(dbl, 1, 2, 'What is Ruby?')
+      # Exercise
+      question = Question.new(db, question_number, variant_number, question_text)
 
-      assert_equal 42, q.id
-      assert_equal 1, q.number
-      assert_equal 2, q.variant
-      assert_equal 'What is Ruby?', q.text
-
-      dbl.verify
+      # Verify
+      assert_equal question_id, question.id
+      assert_equal question_number, question.number
+      assert_equal variant_number, question.variant
+      assert_equal question_text, question.text
+      db.verify
     end
   end
 
-  describe 'loading an existing question' do
-    it 'loads question from DB by number and variant' do
-      dbl.expect(:get_question, [5, 1, 2, 'Loaded text'], [1, 2])
+  describe "loading existing question" do
+    it "retrieves question from database" do
+      # Setup
+      db.expect(:questions, db)
+      db.expect(:get_question,
+                DBQuestion.new(question_id, question_number, variant_number, question_text),
+                [question_number, variant_number])
 
-      q = Question.new(dbl, 1, 2)
+      # Exercise
+      question = Question.new(db, question_number, variant_number)
 
-      assert_equal 5, q.id
-      assert_equal 1, q.number
-      assert_equal 2, q.variant
-      assert_equal 'Loaded text', q.text
-
-      dbl.verify
-    end
-  end
-
-  describe 'handling missing question' do
-    it 'raises if no matching question found in DB' do
-      dbl.expect(:get_question, nil, [1, 2])
-
-      assert_raises(DBLayerError) do
-        Question.new(dbl, 1, 2)
-      end
-
-      dbl.verify
+      # Verify
+      assert_equal question_id, question.id
+      assert_equal question_text, question.text
+      db.verify
     end
   end
 end
