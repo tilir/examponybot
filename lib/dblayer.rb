@@ -52,25 +52,26 @@ class DBLayer
   end
 
   def add_user(tguser, priv, name)
+    raise ArgumentError, 'tguser, priv и name не должны быть nil' if tguser.nil? || priv.nil? || name.nil?
+
     safe_sql do
-      rs = @db.get_first_row('SELECT * FROM users WHERE userid = ?', [tguser])
-      if rs.nil?
+      existing = @db.get_first_row('SELECT id FROM users WHERE userid = ?', [tguser])
+      
+      if existing.nil?
         @db.execute('INSERT INTO users (userid, username, privlevel) VALUES (?, ?, ?)', [tguser, name, priv])
-        Logger.print "user #{name} added with priv level #{priv}"
-      else 
+        id = @db.last_insert_row_id
+      else
         @db.execute('UPDATE users SET username = ? WHERE userid = ?', [name, tguser])
-        Logger.print "user #{name} updated with priv level #{priv}"
+        id = existing[0]
       end
-      rs = @db.get_first_row('SELECT * FROM users WHERE userid = ?', [tguser])
-      rs[0]
+
+      id
     end
   end
 
   def get_user_by_id(userid)
     safe_sql do
-      rs = @db.get_first_row('SELECT * FROM users WHERE userid = ?', [userid])
-      return nil if rs.nil? or rs.empty?
-      return rs
+      @db.get_first_row('SELECT id, userid, username, privlevel FROM users WHERE userid = ?', [userid])      
     end
   end
 

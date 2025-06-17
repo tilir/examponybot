@@ -10,7 +10,6 @@
 #------------------------------------------------------------------------------
 
 require 'minitest/autorun'
-require 'sqlite3'
 require 'dblayer'
 
 describe DBLayer do
