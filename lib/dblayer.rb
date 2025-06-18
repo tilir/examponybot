@@ -12,22 +12,7 @@
 require 'sqlite3'
 require_relative 'dbstructure'
 require_relative 'schema'
-
-class Logger
-  @@verbose = false
-
-  def self.set_verbose(value)
-    @@verbose = !!value
-  end
-
-  def self.verbose?
-    @@verbose
-  end
-
-  def self.print(message)
-    puts(message) if @@verbose
-  end
-end
+require_relative 'logger'
 
 class DBLayer
   include Schema

@@ -16,7 +16,7 @@ require 'ostruct'
 require 'handlers'
 
 # Configure once at the beginning (disable for clean test output)
-Logger.set_verbose(false)
+Logger.set_verbose(true)
 
 describe Handler::Command do
   let(:dbname) { ':memory:' }
@@ -111,7 +111,7 @@ describe Handler::Command do
 
     mock_api = Minitest::Mock.new
     mock_api.expect(:send_message, nil) do |h|
-      h[:chat_id] == 123 && h[:text].include?('Registered')
+      h[:chat_id] == 123 && h[:text].include?('name changed')
     end
     mock_api.expect(:send_message, nil) do |h|
       h[:chat_id] == 123 && h[:text].include?('Question 1, variant')

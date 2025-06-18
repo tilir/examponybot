@@ -6,8 +6,14 @@
 #------------------------------------------------------------------------------
 #
 # Pseudo telegram API for unit test purposes
+# It also is used for test importer so it lives here in lib
 #
 #------------------------------------------------------------------------------
+
+require_relative 'logger'
+
+# Configure once at the beginning (disable for clean test output)
+Logger.set_verbose(false)
 
 class PseudoApi
   attr_reader :text

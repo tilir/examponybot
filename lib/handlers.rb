@@ -49,11 +49,7 @@ class Handler
       Logger.print "Registering user: #{name}"
 
       user = register_user(@tguser.id, name)
-      if (user)
-        privilege = user.privileged? ? ' (privileged)' : ''
-        @api.send_message(chat_id: @tguser.id, text: "Registered#{privilege} as #{user.name}")
-        assign_questions_if_needed(user)
-      end
+      assign_questions_if_needed(user) if user
     end
 
     def help
@@ -91,7 +87,7 @@ class Handler
 
     def update_existing_user(user, userid, name)
       if user.username != name
-        create_regular_user(userid, name).tap do
+        User.new(@dbl, userid, :regular, name).tap do
           log_name_change(userid, user.username, name)
         end
       else

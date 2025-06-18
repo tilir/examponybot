@@ -11,6 +11,10 @@
 
 require_relative 'handlers'
 require_relative 'pseudoapi'
+require_relative 'logger'
+
+# Configure once at the beginning (disable for clean test output)
+Logger.set_verbose(false)
 
 class QuestionImporter
   def initialize(filename:, handler:, api:, prepod:, chat:)
@@ -36,7 +40,7 @@ class QuestionImporter
 
     grouped_questions.each_with_index do |questions, grp_index|
       group_id = grp_index + 1
-      puts "Group #{group_id} (#{questions.size} questions)" if @verbose
+      Logger.print "Group #{group_id} (#{questions.size} questions)" if @verbose
 
       questions.each_with_index do |question_text, question_index|
         question_id = question_index + 1
@@ -78,6 +82,6 @@ class QuestionImporter
     event = PseudoMessage.new(@prepod, @chat, full_text)
     @handler.process_message(@api, event)
 
-    puts "Q#{exam_id}.#{question_id} added: #{@api.text}" if @verbose
+    Logger.print "Q#{exam_id}.#{question_id} added: #{@api.text}" if @verbose
   end
 end
