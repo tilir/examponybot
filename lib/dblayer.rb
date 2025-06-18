@@ -33,9 +33,17 @@ class DBLayer
   include Schema
 
   def initialize(dbname)
-    @db = SQLite3::Database.new(dbname)
-    @db.results_as_hash = false
-    create_schema(@db)
+    @dbname = dbname
+    setup_database
+  end
+
+  def clear_all!
+    Logger.print "Clear all"
+    if in_memory_db? || @db.nil?
+      reconnect_database
+    else
+      clear_tables
+    end
     initialize_managers
   end
 
@@ -64,6 +72,37 @@ class DBLayer
   end
 
   private
+
+  def setup_database
+    @db = SQLite3::Database.new(@dbname)
+    @db.results_as_hash = false
+    create_schema(@db)
+    initialize_managers
+  end
+
+  def reconnect_database
+    @db.close if @db
+    setup_database
+  end
+
+  def clear_tables
+    transaction do
+      execute("PRAGMA foreign_keys = OFF")
+      get_user_tables.each { |t| execute("DELETE FROM #{t}") }
+      execute("DELETE FROM sqlite_sequence")
+      execute("PRAGMA foreign_keys = ON")
+    end
+  end
+
+  def get_user_tables
+    execute("SELECT name FROM sqlite_master WHERE type='table'")
+      .flatten
+      .reject { |t| t.start_with?('sqlite_') }
+  end
+
+  def in_memory_db?
+    @dbname == ':memory:'
+  end
 
   def initialize_managers
     @users = UserManager.new(self)
@@ -121,11 +160,13 @@ class UserManager
   end
   
   def users_empty?
-    rs = @db.execute('SELECT * FROM users')
-    Logger.print 'user table empty' if rs.empty?
-    rs.empty?
+    not any?
   end
-  
+
+  def any?
+    @db.get_first_value('SELECT 1 FROM users LIMIT 1') == 1
+  end
+
   def all_users
     @db.execute('SELECT id, userid, username, privlevel FROM users')
       .map { |row| DBUser.from_db_row(row) }
@@ -202,6 +243,10 @@ class ExamManager
   def initialize(db_layer)
     raise ArgumentError, 'DB layer cannot be nil' if db_layer.nil?
     @db = db_layer
+  end
+
+  def any?
+    @db.get_first_value('SELECT 1 FROM exams LIMIT 1') == 1
   end
   
   def exams_empty?

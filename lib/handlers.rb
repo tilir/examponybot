@@ -28,72 +28,114 @@ class Handler
     def initialize(api, tguser, dbl)
       @api = api
       @tguser = tguser
-
       @dbl = dbl
     end
 
     def try_call(meth, *args)
-      res = nil
       if respond_to?(meth.to_sym)
-        res = send(meth.to_sym, *args)
+        send(meth.to_sym, *args)
+        meth == 'exit'
       else
-        helptext = print_help
-        txt = <<~TXT
-          Unknown command /#{meth}
-          ---
-          #{helptext}
-        TXT
-        @api.send_message(chat_id: @tguser.id, text: txt)
+        handle_unknown_command(meth)
+        false
       end
-      res && meth == 'exit' ? true : false
+    rescue => e
+      handle_error(e)
+      false
     end
 
     def register(name = '')
-      name = "#{@tguser.username}" if name.nil? or name == ''
-      name = "#{@tguser.id}" if name.nil? or name == ''
-      Logger.print "register_user: #{name}"
+      name = determine_name(name)
+      Logger.print "Registering user: #{name}"
 
-      # first user added with pedagogical priviledges
-      if @dbl.users.empty?
-        User.new(@dbl, @tguser.id, :privileged, name)
-        @api.send_message(chat_id: @tguser.id, text: "Registered (privileged) as #{name}")
-        return
-      end
-
-      allu = @dbl.users.all_nonpriv
-      found = allu.find{ |usr| usr.userid == @tguser.id }
-
-      # subsequent users added with student privileges
-      dbuser = User.new(@dbl, @tguser.id, :regular, name)
-      @api.send_message(chat_id: @tguser.id, text: "Registered/updated as #{name}")
- 
-      # new reg with running exam getting its questions
-      if !@dbl.exams.empty?
-        exam = Exam.new(@dbl, 'exam')
-        if found.nil? and exam.state != :stopped
-          nn = @dbl.questions.n_questions
-          nv = @dbl.questions.n_variants
-          prng = Random.new
-
-          (1..nn).each do |n|
-            v = prng.rand(1..nv)
-            q = Question.new(@dbl, n, v)
-            UserQuestion.new(@dbl, exam.id, dbuser.id, q.id)
-            @api.send_message(chat_id: dbuser.userid, text: "Question #{n}, variant #{v}: #{q.text}")
-          end
-        end
-      end
+      user = register_user(@tguser.id, name)
+      send_registration_message(user)
+      assign_questions_if_needed(user)
     end
 
     def help
-      helptext = print_help
-      @api.send_message(chat_id: @tguser.id, text: helptext)
+      @api.send_message(chat_id: @tguser.id, text: help_text)
     end
 
-    private def print_help
+    private
+
+    def determine_name(name)
+      name.empty? ? (@tguser.username || @tguser.id.to_s) : name
+    end
+
+    def register_user(userid, name)
+      if @dbl.users.empty?
+        User.new(@dbl, userid, :privileged, name)
+      else
+        User.new(@dbl, userid, :regular, name)
+      end
+    end
+
+    def send_registration_message(user)
+      privilege = user.privileged? ? ' (privileged)' : ''
+      @api.send_message(
+        chat_id: @tguser.id,
+        text: "Registered#{privilege} as #{user.name}"
+      )
+    end
+
+    def assign_questions_if_needed(user)
+      return unless @dbl.exams.any?
+      return if @dbl.users.all_nonpriv.empty?
+
+      # TODO: rework this to accept multiple exams
+      exam = Exam.new(@dbl, 'exam')
+      return if exam.state == :stopped
+
+      assign_questions(user, exam)
+    end
+
+    def assign_questions(user, exam)
+      Logger.print "Assigning questions for user: #{user.username}"
+      n_questions = @dbl.questions.n_questions
+      n_variants = @dbl.questions.n_variants
+      prng = Random.new
+
+      (1..n_questions).each do |n|
+        variant = prng.rand(1..n_variants)
+        question = Question.new(@dbl, n, variant)
+        UserQuestion.new(@dbl, exam.id, user.id, question.id)
+        send_question(user, question)
+      end
+    end
+
+    def send_question(user, question)
+      @api.send_message(
+        chat_id: user.userid,
+        text: "Question #{question.number}, variant #{question.variant}: #{question.text}"
+      )
+    end
+
+    def help_text
       <<~HELP
-        /register [name] -- register yourself as a user.
+        Available commands:
+        /register [name] - Register yourself as user
+        /help - Show this help
       HELP
+    end
+
+    def handle_unknown_command(command)
+      @api.send_message(
+        chat_id: @tguser.id,
+        text: <<~TXT
+          Unknown command /#{command}
+          ---
+          #{help_text}
+        TXT
+      )
+    end
+
+    def handle_error(error)
+      Logger.print "Error: #{error.message}"
+      @api.send_message(
+        chat_id: @tguser.id,
+        text: "An error occurred: #{error.message}"
+      )
     end
   end
 

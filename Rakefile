@@ -12,6 +12,7 @@ test_files = [
   'test/dbstructure/question_tests.rb',
   'test/dbstructure/review_tests.rb',
   'test/dbstructure/user_tests.rb',
+  'test/handlers/command_tests.rb',
 ]
 
 Rake::TestTask.new(:test) do |t|

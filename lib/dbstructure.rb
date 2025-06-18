@@ -84,6 +84,8 @@ class User < DBUser
       \tPrivilege: #{level} (#{privlevel})
     USER_INFO
   end
+
+  alias_method :name, :username
 end
 
 class Question < DBQuestion
