@@ -10,9 +10,18 @@
 #------------------------------------------------------------------------------
 
 class PseudoApi
-  attr_accessor :text
+  attr_reader :text
+  
+  def initialize
+    @text = ""
+  end
+  
+  def text!
+    @text.tap { @text = "" }
+  end
+
   def send_message(chat_id:, text:)
-    @text = "#{chat_id} : #{text}"
+    @text << "#{chat_id} : #{text}\n"
     Logger.print @text
   end
 end

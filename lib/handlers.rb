@@ -49,8 +49,11 @@ class Handler
       Logger.print "Registering user: #{name}"
 
       user = register_user(@tguser.id, name)
-      send_registration_message(user)
-      assign_questions_if_needed(user)
+      if (user)
+        privilege = user.privileged? ? ' (privileged)' : ''
+        @api.send_message(chat_id: @tguser.id, text: "Registered#{privilege} as #{user.name}")
+        assign_questions_if_needed(user)
+      end
     end
 
     def help
@@ -65,18 +68,57 @@ class Handler
 
     def register_user(userid, name)
       if @dbl.users.empty?
-        User.new(@dbl, userid, :privileged, name)
+        create_privileged_user(userid, name)
       else
-        User.new(@dbl, userid, :regular, name)
+        existing_user = @dbl.users.get_user_by_id(userid)
+        handle_existing_or_new_user(existing_user, userid, name)
       end
     end
 
-    def send_registration_message(user)
-      privilege = user.privileged? ? ' (privileged)' : ''
-      @api.send_message(
-        chat_id: @tguser.id,
-        text: "Registered#{privilege} as #{user.name}"
-      )
+    def create_privileged_user(userid, name)
+      User.new(@dbl, userid, :privileged, name).tap do
+        log_registration(userid, name, 'privileged')
+      end
+    end
+
+    def handle_existing_or_new_user(user, userid, name)
+      if user
+        update_existing_user(user, userid, name)
+      else
+        create_regular_user(userid, name)
+      end
+    end
+
+    def update_existing_user(user, userid, name)
+      if user.username != name
+        create_regular_user(userid, name).tap do
+          log_name_change(userid, user.username, name)
+        end
+      else
+        log_already_registered(userid, name)
+        nil
+      end
+    end
+
+    def create_regular_user(userid, name)
+      User.new(@dbl, userid, :regular, name).tap do
+        log_registration(userid, name, 'regular')
+      end
+    end
+
+    def log_registration(userid, name, type)
+      @api.send_message(chat_id: @tguser.id, 
+                       text: "User #{userid} registered as #{type}: #{name}")
+    end
+
+    def log_name_change(userid, old_name, new_name)
+      @api.send_message(chat_id: @tguser.id,
+                       text: "User #{userid} name changed from #{old_name} to #{new_name}")
+    end
+
+    def log_already_registered(userid, name)
+      @api.send_message(chat_id: @tguser.id,
+                       text: "User #{userid} already registered as #{name}")
     end
 
     def assign_questions_if_needed(user)
@@ -131,10 +173,28 @@ class Handler
     end
 
     def handle_error(error)
-      Logger.print "Error: #{error.message}"
+      error_location = error.backtrace_locations&.first
+      file, line = error_location.path, error_location.lineno if error_location
+
+      error_message = <<~ERROR_MSG
+        +++ CRASH REPORT +++
+        Time: #{Time.now}
+        Error: #{error.class} - #{error.message}
+        Location: #{file}:#{line}
+        
+        FULL BACKTRACE:
+        #{error.backtrace&.join("\n")}
+        
+        CONTEXT:
+        User: #{@tguser.inspect}
+        Method: #{__method__}
+      ERROR_MSG
+
+      Logger.print(error_message)
+
       @api.send_message(
         chat_id: @tguser.id,
-        text: "An error occurred: #{error.message}"
+        text: error_message
       )
     end
   end
@@ -262,7 +322,17 @@ class Handler
     end
 
     def stopexam(rest = '')
-      Exam.new(@dbl, 'exam').set_state(:stopped)
+      if @dbl.exams.empty?
+        @api.send_message(chat_id: @tguser.id, text: 'No exam to stop')
+        return
+      end
+      exam = Exam.new(@dbl, 'exam')
+      if (exam.state == :stopped)
+        @api.send_message(chat_id: @tguser.id, text: 'Exam already stopped')
+        return
+      end
+      exam.set_state(:stopped)
+      @api.send_message(chat_id: @tguser.id, text: 'Exam stopped')
     end
 
     def startreview(rest = '')

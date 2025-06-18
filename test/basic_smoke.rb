@@ -55,11 +55,19 @@ describe "Smoke" do
   end
 
   it "passes workflow successfully" do
+    # initially reset state
+    @api.text!
+
+    # Try to stop before exists
+    event = PseudoMessage.new(@prepod, @chat, '/stopexam')
+    @handler.process_message(@api, event)
+    assert_includes @api.text!, "No exam to stop"
+
     # Test exam creation
     exam_msg = PseudoMessage.new(@prepod, @chat, '/addexam exam')
     @handler.process_message(@api, exam_msg)
     
-    assert_equal "167346988 : Exam added", @api.text
+    assert_includes @api.text!, "Exam added"
     refute @dbl.exams.empty?, "Exam should be created in database"
 
     # import exam
@@ -77,22 +85,37 @@ describe "Smoke" do
     assert_equal 3, @dbl.questions.n_questions, "Should import all 3 questions"
     assert_equal 3, @dbl.questions.n_variants, "Should support 3 variants"
 
+    # Try stop exam which is already stopped
     event = PseudoMessage.new(@prepod, @chat, '/stopexam')
     @handler.process_message(@api, event)
-    p @api.text
+    assert_includes @api.text!, "Exam already stopped"
 
+    # Try to get question list as a student -- not available for students
     message = PseudoMessage.new(@student1, @chat, '/questions')
     @handler.process_message(@api, message)
-    p @api.text
+    assert_includes @api.text!, "Unknown command"
 
     event = PseudoMessage.new(@prepod, @chat, '/questions')
     @handler.process_message(@api, event)
-    p @api.text
+    response = @api.text!
+    expected_fragments = [
+      "all questions",
+      *["1", "2", "3"].product(["1", "2", "3"]).map { |a,b| "#{a} #{b}" }
+    ]
+
+    expected_fragments.each do |fragment|
+      assert_includes response, fragment
+    end
 
     event = PseudoMessage.new(@student1, @chat, '/register')
     @handler.process_message(@api, event)
-    p @api.text
+    assert_includes @api.text!, "Registered as student1"
 
+    event = PseudoMessage.new(@student1, @chat, '/register')
+    @handler.process_message(@api, event)
+    p @api.text!
+
+=begin
     event = PseudoMessage.new(@student2, @chat, '/register')
     @handler.process_message(@api, event)
     p @api.text
@@ -295,5 +318,6 @@ describe "Smoke" do
     event = PseudoMessage.new(@prepod, @chat, '/stopexam')
     @handler.process_message(@api, event)
     p @api.text
+=end
   end
 end

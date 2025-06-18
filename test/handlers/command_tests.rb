@@ -125,17 +125,3 @@ describe Handler::Command do
   end
 end
 
-=begin
-api_spy = Class.new do
-  attr_reader :calls
-  
-  def initialize
-    @calls = []
-  end
-  
-  def send_message(**params)
-    @calls << params
-    nil
-  end
-end.new
-=end
