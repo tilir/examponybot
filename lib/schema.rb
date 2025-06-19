@@ -167,3 +167,31 @@ class DBReview
   end
 end
 
+def log_database_contents(db)
+  tables = %w[
+    users
+    questions
+    exams
+    userquestions
+    answers
+    userreviews
+    reviews
+  ]
+
+  tables.each do |table|
+    puts "--- Table: #{table} ---"
+    rows = db.execute("SELECT * FROM #{table}")
+    columns = db.execute("PRAGMA table_info(#{table})").map { |col| col[1] }
+
+    if rows.empty?
+      puts "(empty)"
+    else
+      rows.each_with_index do |row, idx|
+        row_hash = columns.zip(row).to_h
+        puts "#{idx + 1}. #{row_hash.inspect}"
+      end
+    end
+
+    puts
+  end
+end

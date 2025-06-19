@@ -205,7 +205,8 @@ class Handler
       end
 
       qualified = []
-      allu.each do |user|
+      allu.each do |dbuser|
+        user = User.from_db_user(@dbl, dbuser)
         userrevs = user.review_count
         if userrevs < userreq
           txt = <<~TXT
@@ -301,20 +302,8 @@ class Handler
         return
       end
       exam.set_state(:answering)
-
-      allu = @dbl.users.all_nonpriv
-      nn = @dbl.questions.n_questions
-      nv = @dbl.questions.n_variants
-      prng = Random.new
-
-      allu.each do |dbuser|
-        (1..nn).each do |n|
-          v = prng.rand(1..nv)
-          q = Question.new(@dbl, n, v)
-          UserQuestion.new(@dbl, exam.id, dbuser.id, q.id)
-          @api.send_message(chat_id: dbuser.userid, text: "Question #{n}, variant #{v}: #{q.text}")
-        end
-      end
+      @api.send_message(chat_id: @tguser.id, text: 'Exam started, sending questions')
+      @dbl.users.all_nonpriv.each { |dbuser| assign_questions(dbuser, exam) }
     end
 
     def stopexam(rest = '')
@@ -457,15 +446,16 @@ class Handler
 
       return unless check_question_number(n)
 
-      dbuser = User.new(@dbl, @tguser.id)
-      uqst = dbuser.nth_question(exam.id, n)
+      dbuser = @dbl.users.get_user_by_id(@tguser.id)
+      user = User.from_db_user(@dbl, dbuser)
+      uqst = user.nth_question(exam.id, n)
 
       if uqst.nil?
         @api.send_message(chat_id: @tguser.id, text: "You don't have this question yet.")
         return
       end
       
-      Answer.new(@dbl, uqst.id, t)
+      answ = @dbl.answers.create_or_update(uqst.id, t)
       @api.send_message(chat_id: @tguser.id, text: "Answer recorded to #{uqst.id}")
     end
 

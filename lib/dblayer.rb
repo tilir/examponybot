@@ -49,6 +49,10 @@ class DBLayer
     safe_sql { @db.transaction(&block) }
   end
 
+  def dumpdb
+    log_database_contents @db if @db
+  end
+
   # Access to managers
   attr_reader :users, :questions, :exams, :user_questions, :answers, :reviews
 
@@ -272,6 +276,11 @@ class UserQuestionManager
     @db = db_layer
   end
 
+  def all
+    @db.execute('SELECT * FROM userquestions')
+      .map { |row| DBUserQuestion.from_db_row(row) }
+  end
+
   def register_question(eid, uid, qid)
     raise ArgumentError, 'qid cannot be nil' if qid.nil?
 
@@ -290,21 +299,33 @@ class UserQuestionManager
     else
       Logger.print "question #{qid} link with user #{uid} already exists"
       row = @db.get_first_row('SELECT id, exam, user, question FROM userquestions WHERE id = ?', row[0])
+      raise "row cannot be nil" if row.nil?
     end
     
     row.nil? ? nil : DBUserQuestion.from_db_row(row)
   end
 
-  def user_nth_question(eid, uid, n)
-    row = @db.get_first_row('SELECT id FROM questions WHERE number = ?', n)
-    return nil if row.nil?
-    
-    qid = row[0]
-    row = @db.get_first_row(
-      'SELECT id, exam, user, question FROM userquestions WHERE exam = ? AND user = ? AND question = ?',
-      eid, uid, qid
-    )
-    row.nil? ? nil : DBUserQuestion.from_db_row(row)
+  def user_nth_question(exam_id, user_id, question_number)
+    query = <<~SQL
+      SELECT uq.id, uq.exam, uq.user, uq.question
+      FROM userquestions uq
+      JOIN questions q ON uq.question = q.id
+      WHERE uq.exam = ? 
+        AND uq.user = ? 
+        AND q.number = ?
+    SQL
+
+    rows = @db.execute(query, exam_id, user_id, question_number)
+
+    case rows.size
+    when 0
+      Logger.print("Question not found: exam=#{exam_id}, user=#{user_id}, number=#{question_number}")
+      nil
+    when 1
+      DBUserQuestion.from_db_row(rows.first)
+    else
+      raise "Found #{rows.size} questions for user #{user_id}, exam #{exam_id}, number #{question_number}"
+    end
   end
 
   alias_method :register, :register_question
@@ -355,6 +376,7 @@ class AnswerManager
   end
 
   def user_all_answers(uid)
+    Logger.print "Query all answers for user #{uid}"
     query = <<-SQL
       SELECT answers.* FROM userquestions
       INNER JOIN answers ON userquestions.id = answers.uqid
@@ -369,7 +391,7 @@ class AnswerManager
       INNER JOIN users ON users.id = userquestions.user
       INNER JOIN answers ON userquestions.id = answers.uqid
     SQL
-    @db.execute(query).map { |row| User.from_db_user(@db, DBUser.from_db_row(row)) }
+    @db.execute(query).map { |row| DBUser.from_db_row(row) }
   end
 
   alias_method :create_or_update, :record_answer

@@ -17,13 +17,15 @@ require 'dbstructure'
 describe Exam do
   let(:db) { Minitest::Mock.new }
   let(:exam_id) { 42 }
-  let(:exam_name) { "Midterm Exam" }
+  let(:exam_name) { "exam" }
   let(:initial_state) { ExamStates.to_i(:stopped) }
 
-  describe "initialization" do
+  describe "Exam initialization" do
     it "creates exam with correct attributes" do
       # Setup mock expectations
       db.expect(:nil?, false)
+      db.expect(:empty?, true)
+      db.expect(:exams, db)
       db.expect(:exams, db)
       db.expect(:exams, db)
       db.expect(:find_by_name, nil, [exam_name])
@@ -46,6 +48,8 @@ describe Exam do
     it "returns formatted exam details" do
       # Setup
       db.expect(:nil?, false)
+      db.expect(:empty?, true)
+      db.expect(:exams, db)
       db.expect(:exams, db)
       db.expect(:exams, db)
       db.expect(:find_by_name, nil, [exam_name])
@@ -60,7 +64,7 @@ describe Exam do
       # Expected output
       expected_output = <<~EXAM.chomp
         Exam: 42
-        \tName: Midterm Exam
+        \tName: exam
         \tState: stopped (0)
       EXAM
 
@@ -74,7 +78,9 @@ describe Exam do
       # First exam should succeed
       db.expect(:exams, db)
       db.expect(:exams, db)
+      db.expect(:exams, db)
       db.expect(:nil?, false)
+      db.expect(:empty?, true)
       db.expect(:find_by_name, nil, ["First Exam"])
       db.expect(:add_exam, DBExam.new(1, 0, "First Exam"), ["First Exam"])
 

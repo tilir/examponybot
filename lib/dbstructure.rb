@@ -12,6 +12,7 @@
 require_relative 'examstate'
 require_relative 'userstate'
 require_relative 'schema'
+require_relative 'logger'
 
 class User < DBUser
   UserStates::STATES.each_key do |state|
@@ -56,9 +57,12 @@ class User < DBUser
   end
 
   def nth_question(exam_id, question_number)
+    Logger.print("Query nth question: #{exam_id}, #{id}, #{question_number}")
     uq = @db.user_questions.user_nth_question(exam_id, id, question_number)
+    raise "uq.user_id shall be equal to user id" unless id == uq.user_id
     return nil unless uq
     
+    Logger.print("Got nth question: #{uq.exam_id}, #{uq.user_id}, #{uq.question_id}")
     UserQuestion.new(@db, uq.exam_id, uq.user_id, uq.question_id)
   end
 
@@ -129,8 +133,12 @@ class Exam < DBExam
     
     # If not found - create new one
     unless db_exam
+      Logger.print "Adding new exam #{name}"
+      raise "Currently only single exam supported" unless @db.exams.empty?
       db_exam = @db.exams.add_exam(name)
       raise "Exam creation failed" unless db_exam
+    else
+      Logger.print "Found existing exam #{name}"
     end
 
     # Initialize parent class

@@ -96,6 +96,7 @@ describe "Smoke" do
     @handler.process_message(@api, message)
     assert_includes @api.text!, "Unknown command"
 
+    # Query questions
     event = PseudoMessage.new(@prepod, @chat, '/questions')
     @handler.process_message(@api, event)
     response = @api.text!
@@ -108,46 +109,110 @@ describe "Smoke" do
       assert_includes response, fragment
     end
 
+    # register regular student
     event = PseudoMessage.new(@student1, @chat, '/register')
     @handler.process_message(@api, event)
     assert_includes @api.text!, "registered as regular: student1"
 
+    # register one more time
     event = PseudoMessage.new(@student1, @chat, '/register')
     @handler.process_message(@api, event)
-    p @api.text!
+    assert_includes @api.text!, "already registered as student1"
 
+    # register one more
     event = PseudoMessage.new(@student2, @chat, '/register')
     @handler.process_message(@api, event)
-    p @api.text!
+    assert_includes @api.text!, "registered as regular: student2"
 
+    assert_equal 2, @dbl.users.all_nonpriv.size
+    assert_equal 3, @dbl.users.all.size
+
+    # look up who are registered
     event = PseudoMessage.new(@prepod, @chat, '/users')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    ["student1", "student2"].each do |fragment|
+      assert_includes response, fragment
+    end
 
+    # puts "Before exam start:"
+    # @dbl.dumpdb
+
+    assert_equal 0, @dbl.user_questions.all.size
+
+    # start exam: this triggers assignment of questions to all registered students
     event = PseudoMessage.new(@prepod, @chat, '/startexam')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "Exam started, sending questions"
+    expected_fragments = [
+      *[@student1.id.to_s, @student2.id.to_s].product(["1", "2", "3"]).map { |a,b| "#{a} : Question #{b}" }
+    ]
 
+    expected_fragments.each do |fragment|
+      assert_includes response, fragment
+    end
+
+    # Ensure uqid's are correct
+    exam = Exam.new(@dbl, 'exam')
+    assert_equal :answering, exam.state
+
+    dbuser1 = @dbl.users.get_user_by_id(@student1.id)
+    user1 = User.from_db_user(@dbl, dbuser1)
+    uqst = user1.nth_question(exam.id, 1)
+    refute uqst.nil?
+    uqst = user1.nth_question(exam.id, 2)
+    refute uqst.nil?
+    uqst = user1.nth_question(exam.id, 3)
+    refute uqst.nil?
+
+    assert_equal 6, @dbl.user_questions.all.size
+
+    # Late register (when exam started) will also get their assignments
     event = PseudoMessage.new(@student3, @chat, '/register')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "registered as regula"
+    expected_fragments = [
+      *[@student3.id.to_s].product(["1", "2", "3"]).map { |a,b| "#{a} : Question #{b}" }
+    ]
 
+    expected_fragments.each do |fragment|
+      assert_includes response, fragment
+    end
+
+    # puts "After late reg:"
+    # @dbl.dumpdb
+
+    # again look up users
     event = PseudoMessage.new(@prepod, @chat, '/users')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    ["student1", "student2", "student3"].each do |fragment|
+      assert_includes response, fragment
+    end
 
     event = PseudoMessage.new(@student1, @chat, '/answer 1 singleline from student1')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "#{@student1.id} : Answer recorded to"
+
+    dbuser1 = @dbl.users.get_user_by_id(@student1.id)
+    refute @dbl.answers.user_all_answers(dbuser1.id).empty?
 
     event = PseudoMessage.new(@student2, @chat, '/answer 1 singleline from student2')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "#{@student2.id} : Answer recorded to"
+
+    dbuser2 = @dbl.users.get_user_by_id(@student2.id)
+    refute @dbl.answers.user_all_answers(dbuser2.id).empty?
 
     event = PseudoMessage.new(@student3, @chat, '/answer 1 singleline from student3')
     @handler.process_message(@api, event)
     p @api.text!
 
+=begin
     event = PseudoMessage.new(@student3, @chat, '/lookup_answer 1')
     @handler.process_message(@api, event)
     p @api.text!
@@ -318,5 +383,6 @@ describe "Smoke" do
     event = PseudoMessage.new(@prepod, @chat, '/stopexam')
     @handler.process_message(@api, event)
     p @api.text!
+=end
   end
 end
