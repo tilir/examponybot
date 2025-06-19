@@ -1,2 +1,5 @@
+/archive/
 /vendor/
 .bundle/
+/hello/
+/Gemfile.lock

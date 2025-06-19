@@ -344,6 +344,11 @@ class AnswerManager
     @db = db_layer
   end
 
+  def all
+    @db.execute('SELECT * FROM answers')
+       .map { |row| DBAnswer.from_db_row(row) }
+  end
+
   def record_answer(uqid, t)
     row = @db.get_first_row('SELECT id FROM answers WHERE uqid = ?', uqid)
 
@@ -499,29 +504,49 @@ class ReviewManager
   # @param telegram_user_id [Integer] Telegram user ID (users.userid)
   # @return [Array<Hash>] Review assignments with:
   #   - :question [DBQuestion]
-  #   - :answer [DBAnswer, nil] 
+  #   - :answer [DBAnswer, nil]
   #   - :assignment [DBUserReview]
   def get_review_assignments(telegram_user_id)
     query = <<~SQL
-      SELECT 
-        q.id, q.number, q.variant, q.question,
-        a.id, a.uqid, a.answer,
-        ur.id, ur.reviewer, ur.uqid
+      SELECT#{' '}
+        -- Question data
+        q.id AS qid,
+        q.number AS q_number,
+        q.variant AS q_variant,
+        q.question AS q_text,
+      #{'  '}
+        -- Answer data
+        a.id AS a_id,
+        a.answer AS a_text,
+      #{'  '}
+        -- Answer author data
+        ua.id AS author_id,
+        ua.userid AS author_telegram_id,
+        ua.username AS author_username,
+      #{'  '}
+        -- Review assignment data
+        ur.id AS ur_id,
+        ur.reviewer AS reviewer_internal_id,
+        ur.uqid AS uqid
       FROM userreviews ur
-      JOIN users u ON ur.reviewer = u.id
+      JOIN users ur_user ON ur.reviewer = ur_user.id
       JOIN userquestions uq ON ur.uqid = uq.id
       JOIN questions q ON uq.question = q.id
       LEFT JOIN answers a ON a.uqid = uq.id
-      WHERE u.userid = ?
+      JOIN users ua ON uq.user = ua.id  -- Author of the answer
+      WHERE ur_user.userid = ?
     SQL
 
-    @db.execute(query, telegram_user_id).map do |(qid, qnum, qvar, qtext, 
-                                                aid, auqid, aanswer,
-                                                urid, urrev, uruqid)|
+    @db.execute(query, telegram_user_id).map do |row|
       {
-        question: DBQuestion.new(qid, qnum, qvar, qtext),
-        answer: aid ? DBAnswer.new(aid, auqid, aanswer) : nil,
-        assignment: DBUserReview.new(urid, urrev, uruqid)
+        question: DBQuestion.new(row[0], row[1], row[2], row[3]),
+        answer: row[4] ? DBAnswer.new(row[4], row[8], row[5]) : nil, # row[8] is uqid
+        author: {
+          id: row[6],
+          telegram_id: row[7],
+          username: row[8]
+        },
+        assignment: DBUserReview.new(row[9], row[10], row[11])
       }
     end
   end
@@ -530,4 +555,5 @@ class ReviewManager
   alias submit record_review
   alias count_by_user nreviews
   alias find_by_assignment query_review
+  alias all_for_answer allreviews
 end

@@ -15,14 +15,14 @@
 #
 # users ||--o{ userquestions : "user→id"
 #           | id (PK)
-#           | userid (UNIQUE, Telegram ID)  
+#           | userid (UNIQUE, Telegram ID)
 #           | username
 #           | privlevel (0-nonexistent, 1-regular, 2-privileged)
 #
 # questions ||--o{ userquestions : "question→id"
 #             | id (PK)
 #             | number (question #)
-#             | variant (version #)  
+#             | variant (version #)
 #             | question (text)
 #             UNIQUE(number, variant)
 #

@@ -18,7 +18,7 @@ require 'ostruct'
 require 'handlers'
 
 # Configure once at the beginning (disable for clean test output)
-Logger.set_verbose(true)
+Logger.set_verbose(false)
 
 describe Handler::Command do
   let(:dbname) { ':memory:' }

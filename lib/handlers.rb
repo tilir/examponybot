@@ -310,15 +310,13 @@ class Handler
       exam.set_state(:grading)
 
       nn = @dbl.questions.n_questions
-      nv = @dbl.questions.n_variants
-      userreq = nv * N_REVIEWERS
 
-      qualified = qualify_users(@api, @tguser, userreq)
+      qualified = qualify_users(@api, @tguser)
       qualified.each do |user|
         totalgrade = 0
         answs = user.all_answers
         answs.each do |answ|
-          allrevs = answ.allreviews
+          allrevs = answ.all_reviews
           qst = answ.to_question
           if allrevs.empty?
             @api.send_message(chat_id: user.userid, text: "Sorry, answer to question #{qst.number} had no reviews")
@@ -333,7 +331,7 @@ class Handler
           allrevs.each do |rev|
             txt = <<~TXT
               --- Review text ---
-              #{rev.text}
+              #{rev.review}
               -------------------
               Review grade: #{rev.grade}
             TXT
@@ -359,7 +357,7 @@ class Handler
     private
 
     # utils
-    def qualify_users(api, tguser, userreq)
+    def qualify_users(api, tguser)
       allu = @dbl.answers.all_answered_users
       if allu.nil?
         api.send_message(chat_id: tguser.id, text: 'No answered users yet')
@@ -370,6 +368,8 @@ class Handler
       allu.each do |dbuser|
         user = User.from_db_user(@dbl, dbuser)
         userrevs = user.review_count
+        assignments = @dbl.reviews.get_review_assignments(dbuser.userid)
+        userreq = assignments.size
         if userrevs < userreq
           txt = <<~TXT
             You haven't done your reviewing due.
@@ -408,7 +408,8 @@ class Handler
           #{ans.text}
         TXT
         api.send_message(chat_id: reviewer.userid, text: txt)
-        api.send_message(chat_id: reviewer.userid, text: "You was assigned review #{review.id}. Please review it thoroughly.")
+        api.send_message(chat_id: reviewer.userid,
+                         text: "You was assigned review #{review.id}. Please review it thoroughly.")
         Logger.print "Assigned review #{review.id} to #{reviewer.userid}"
       end
     end
@@ -520,11 +521,19 @@ class Handler
         return
       end
 
-      re = /(\d+)\s+(\d+)\s+(.+)/m
-      m = rest.match(re).to_a
-      urid = m[1].to_i
-      g = m[2].to_i
-      t = m[3]
+      re = /(?<urid>\d+)\s+(?<grade>-?\d+)\s+(?<review>.+)/m
+      match = rest.match(re)
+
+      Logger.print "<#{rest}> -> <#{match}>"
+
+      unless match && match[:urid] && match[:grade] && match[:review]
+        @api.send_message(chat_id: @tguser.id, text: 'You need to specify review number, grade and review text')
+        return
+      end
+
+      urid = match[:urid].to_i
+      g = match[:grade].to_i
+      t = match[:review]
 
       if (g < 1) || (g > 10)
         @api.send_message(chat_id: @tguser.id, text: 'Grade shall be 1 .. 10')
@@ -541,8 +550,8 @@ class Handler
       Review.new(@dbl, urid, g, t)
       @api.send_message(chat_id: @tguser.id, text: "Review assignment #{urid} recorded/updated")
 
-      nv = @dbl.questions.n_variants
-      userreq = nv * N_REVIEWERS
+      assignments = @dbl.reviews.get_review_assignments(@tguser.id)
+      userreq = assignments.size
       userrevs = dbuser.review_count
       @api.send_message(chat_id: @tguser.id, text: "You sent #{userrevs} out of #{userreq} required reviews")
     end

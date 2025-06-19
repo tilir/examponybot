@@ -351,6 +351,7 @@ describe 'Smoke' do
     assert_includes response, "#{@student3.id} : Answer recorded to"
 
     allanswered = @dbl.answers.all_answered_users
+
     assert_equal 3, allanswered.size
 
     # create review assignments
@@ -370,114 +371,141 @@ describe 'Smoke' do
     # no answers mean no review
     refute_includes response, "#{@student4.id} : You was assigned review"
 
-    s1r = @dbl.reviews.get_review_assignments(@student1.id)
+    s1assignments = @dbl.reviews.get_review_assignments(@student1.id)
 
-    puts "After review assignment #{s1r}"
-    @dbl.dumpdb
+    refute(s1assignments.any? { |a| a[:author_telegram_id] == @student1.id })
 
-    event = PseudoMessage.new(@student1, @chat, "/review 10 2 don't like it")
+    s2assignments = @dbl.reviews.get_review_assignments(@student2.id)
+
+    refute(s2assignments.any? { |a| a[:author_telegram_id] == @student2.id })
+
+    s3assignments = @dbl.reviews.get_review_assignments(@student3.id)
+
+    refute(s3assignments.any? { |a| a[:author_telegram_id] == @student3.id })
+
+    total = s1assignments.size + s2assignments.size + s3assignments.size
+
+    # every answer gone to N_REVIEWERS
+    assert_equal total, @dbl.answers.all.size * N_REVIEWERS
+
+    # puts "After review assignment #{total}"
+    # @dbl.dumpdb
+
+    # student reviews proper assignment (urid correct)
+    review_id = s1assignments.dig(0, :assignment)&.id
+    event = PseudoMessage.new(@student1, @chat, "/review #{review_id} 2 don't like it")
     @handler.process_message(@api, event)
     response = @api.text!
+
     assert_includes response, "#{@student1.id} : Review assignment"
-    assert_includes response, "recorded/updated"
+    assert_includes response, 'recorded/updated'
     assert_includes response, "#{@student1.id} : You sent"
 
     assert_equal 1, @dbl.reviews.tguser_reviews(@student1.id).size
 
-    event = PseudoMessage.new(@student1, @chat, "/review 11 2 don't like it")
+    # student reviews improper assignment (urid incorrect, 11000 is too large)
+    event = PseudoMessage.new(@student1, @chat, "/review 11000 2 don't like it")
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
 
-=begin
-    event = PseudoMessage.new(@student1, @chat, "/review 12 2 don't like it")
+    assert_includes response, 'is not your review assignment'
+
+    # all other proper ones
+    ncorr = 1
+    s1assignments.each_with_index do |assignment, _index|
+      review_id = assignment[:assignment].id
+      # first check was manual
+      next if review_id == s1assignments.dig(0, :assignment)&.id
+
+      event = PseudoMessage.new(@student1, @chat, "/review #{review_id} 2 don't like it")
+      @handler.process_message(@api, event)
+      response = @api.text!
+      ncorr += 1
+
+      assert_includes response, "#{@student1.id} : You sent #{ncorr} out of #{s1assignments.size} required reviews"
+    end
+
+    # try to set -1
+    review_id = s1assignments.dig(0, :assignment)&.id
+    event = PseudoMessage.new(@student1, @chat, "/review #{review_id} -1 don't like it")
     @handler.process_message(@api, event)
-    p @api.text
+    response = @api.text!
 
-    event = PseudoMessage.new(@student1, @chat, '/review 12 4 like it better')
+    assert_includes response, 'Grade shall be 1 .. 10'
+
+    # try to set 100
+    review_id = s1assignments.dig(0, :assignment)&.id
+    event = PseudoMessage.new(@student1, @chat, "/review #{review_id} 100 really like it")
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
 
-    event = PseudoMessage.new(@student1, @chat, "/review 13 2 don't like it")
-    @handler.process_message(@api, event)
-    p @api.text!
+    assert_includes response, 'Grade shall be 1 .. 10'
 
-    event = PseudoMessage.new(@student1, @chat, "/review 14 2 don't like it")
-    @handler.process_message(@api, event)
-    p @api.text!
-
-    event = PseudoMessage.new(@student1, @chat, "/review 15 2 don't like it")
-    @handler.process_message(@api, event)
-    p @api.text!
-
-    event = PseudoMessage.new(@student1, @chat, "/review 112 2 don't like it")
-    @handler.process_message(@api, event)
-    p @api.text!
-
-    event = PseudoMessage.new(@student1, @chat, "/review 12 -1 don't like it")
-    @handler.process_message(@api, event)
-    p @api.text!
-
-    event = PseudoMessage.new(@student1, @chat, "/review 12 100 don't like it")
-    @handler.process_message(@api, event)
-    p @api.text!
-
+    # try void command
     event = PseudoMessage.new(@student1, @chat, '/review')
     @handler.process_message(@api, event)
-    p @api.text
+    response = @api.text!
 
+    assert_includes response, 'You need to specify review number, grade and review text'
+
+    # try review assigment 9.5
     event = PseudoMessage.new(@student1, @chat, '/review 9.5')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
 
-    event = PseudoMessage.new(@student1, @chat, '/lookup_review 10')
-    @handler.process_message(@api, event)
-    p @api.text!
+    assert_includes response, 'You need to specify review number, grade and review text'
 
-    event = PseudoMessage.new(@student1, @chat, '/lookup_review 112')
+    # lookup
+    review_id = s1assignments.dig(0, :assignment)&.id
+    event = PseudoMessage.new(@student1, @chat, "/lookup_review #{review_id}")
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
 
-    event = PseudoMessage.new(@student2, @chat, '/review 1 10 like it')
-    @handler.process_message(@api, event)
-    p @api.text!
+    assert_includes response, "Grade: 2. Text: don't like it"
 
-    event = PseudoMessage.new(@student2, @chat, '/review 2 10 like it')
+    # incorrect lookup
+    event = PseudoMessage.new(@student1, @chat, '/lookup_review 100500')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
 
-    event = PseudoMessage.new(@student2, @chat, '/review 3 10 like it')
-    @handler.process_message(@api, event)
-    p @api.text
+    assert_includes response, 'is not your review assignment'
 
-    event = PseudoMessage.new(@student2, @chat, '/review 16 10 like it')
-    @handler.process_message(@api, event)
-    p @api.text!
+    # student 2
+    ncorr = 0
+    s2assignments.each_with_index do |assignment, _index|
+      review_id = assignment[:assignment].id
+      event = PseudoMessage.new(@student2, @chat, "/review #{review_id} 10 like it")
+      @handler.process_message(@api, event)
+      response = @api.text!
+      ncorr += 1
 
-    event = PseudoMessage.new(@student2, @chat, '/review 17 10 like it')
-    @handler.process_message(@api, event)
-    p @api.text!
+      assert_includes response, "#{@student2.id} : You sent #{ncorr} out of #{s2assignments.size} required reviews"
+    end
 
-    event = PseudoMessage.new(@student2, @chat, '/review 18 10 like it')
-    @handler.process_message(@api, event)
-    p @api.text!
+    # student 3: except one
+    ncorr = 0
+    s3assignments.each_with_index do |assignment, index|
+      next if index.zero?
 
-    event = PseudoMessage.new(@student3, @chat, '/review 4 10 like it')
-    @handler.process_message(@api, event)
-    p @api.text!
+      review_id = assignment[:assignment].id
+      event = PseudoMessage.new(@student3, @chat, "/review #{review_id} 10 like it")
+      @handler.process_message(@api, event)
+      response = @api.text!
+      ncorr += 1
 
-    event = PseudoMessage.new(@student3, @chat, '/review 5 10 like it')
-    @handler.process_message(@api, event)
-    p @api.text!
-
-    event = PseudoMessage.new(@student3, @chat, '/review 6 10 like it')
-    @handler.process_message(@api, event)
-    p @api.text!
-=end
+      assert_includes response, "#{@student3.id} : You sent #{ncorr} out of #{s3assignments.size} required reviews"
+    end
 
     # time to set grades
     event = PseudoMessage.new(@prepod, @chat, '/setgrades')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+
+    assert_includes response, "#{@student1.id} : Reviews for your question"
+    assert_includes response, "#{@student2.id} : Reviews for your question"
+    assert_includes response, "#{@student3.id} : You haven't done your reviewing due"
+    assert_includes response, "#{@student1.id} : Your approx grade is"
+    assert_includes response, "#{@student2.id} : Your approx grade is"
 
     # finish
     event = PseudoMessage.new(@prepod, @chat, '/stopexam')
