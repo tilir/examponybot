@@ -408,6 +408,7 @@ class Handler
           #{ans.text}
         TXT
         api.send_message(chat_id: reviewer.userid, text: txt)
+        api.send_message(chat_id: reviewer.userid, text: "You was assigned review #{review.id}. Please review it thoroughly.")
         Logger.print "Assigned review #{review.id} to #{reviewer.userid}"
       end
     end

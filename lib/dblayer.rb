@@ -423,6 +423,17 @@ class ReviewManager
     @db.get_first_value(query, rid)
   end
 
+  def tguser_reviews(tgid)
+    query = <<-SQL
+      SELECT reviews.id, reviews.grade, reviews.review
+      FROM reviews
+      JOIN userreviews ON reviews.revid = userreviews.id
+      JOIN users ON userreviews.reviewer = users.id
+      WHERE users.userid = ?;
+    SQL
+    @db.execute(query, tgid).map { |row| DBReview.from_db_row(row) }
+  end
+
   def create_review_assignment(rid, uqid)
     row = @db.get_first_row(
       'SELECT id FROM userreviews WHERE reviewer = ? AND uqid = ?',
@@ -483,6 +494,36 @@ class ReviewManager
       WHERE userreviews.uqid = ?
     SQL
     @db.execute(query, uqid).map { |row| DBReview.from_db_row(row) }
+  end
+
+  # @param telegram_user_id [Integer] Telegram user ID (users.userid)
+  # @return [Array<Hash>] Review assignments with:
+  #   - :question [DBQuestion]
+  #   - :answer [DBAnswer, nil] 
+  #   - :assignment [DBUserReview]
+  def get_review_assignments(telegram_user_id)
+    query = <<~SQL
+      SELECT 
+        q.id, q.number, q.variant, q.question,
+        a.id, a.uqid, a.answer,
+        ur.id, ur.reviewer, ur.uqid
+      FROM userreviews ur
+      JOIN users u ON ur.reviewer = u.id
+      JOIN userquestions uq ON ur.uqid = uq.id
+      JOIN questions q ON uq.question = q.id
+      LEFT JOIN answers a ON a.uqid = uq.id
+      WHERE u.userid = ?
+    SQL
+
+    @db.execute(query, telegram_user_id).map do |(qid, qnum, qvar, qtext, 
+                                                aid, auqid, aanswer,
+                                                urid, urrev, uruqid)|
+      {
+        question: DBQuestion.new(qid, qnum, qvar, qtext),
+        answer: aid ? DBAnswer.new(aid, auqid, aanswer) : nil,
+        assignment: DBUserReview.new(urid, urrev, uruqid)
+      }
+    end
   end
 
   alias assign_reviewer create_review_assignment

@@ -29,6 +29,7 @@ module PonyBotTestHelper
     @student1 = PseudoTGUser.new(10_002, 'student1')
     @student2 = PseudoTGUser.new(10_003, 'student2')
     @student3 = PseudoTGUser.new(10_004, 'student3')
+    @student4 = PseudoTGUser.new(10_005, 'razdolb')
     @chat = PseudoChat.new(1)
   end
 

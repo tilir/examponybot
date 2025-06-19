@@ -197,6 +197,13 @@ describe 'Smoke' do
       assert_includes response, fragment
     end
 
+    # student4 last to register and no answers
+    event = PseudoMessage.new(@student4, @chat, '/register')
+    @handler.process_message(@api, event)
+    response = @api.text!
+
+    assert_includes response, 'registered as regula'
+
     # puts "After late reg:"
     # @dbl.dumpdb
 
@@ -330,12 +337,11 @@ describe 'Smoke' do
 
     assert_includes response, "#{@student1.id} : Answer recorded to"
 
-    # second student response again
-    event = PseudoMessage.new(@student2, @chat, '/answer 3 singleline from student2')
-    @handler.process_message(@api, event)
-    response = @api.text!
-
-    assert_includes response, "#{@student2.id} : Answer recorded to"
+    # second student do not response (say he don't know the answer)
+    # event = PseudoMessage.new(@student2, @chat, '/answer 3 singleline from student2')
+    # @handler.process_message(@api, event)
+    # response = @api.text!
+    # assert_includes response, "#{@student2.id} : Answer recorded to"
 
     # third student response again
     event = PseudoMessage.new(@student3, @chat, '/answer 3 singleline from student3')
@@ -344,24 +350,45 @@ describe 'Smoke' do
 
     assert_includes response, "#{@student3.id} : Answer recorded to"
 
+    allanswered = @dbl.answers.all_answered_users
+    assert_equal 3, allanswered.size
+
     # create review assignments
-    # we have 3 students, 3 answers each, 2 reviewers per answer yield 18 review assignments
+    # we have 4 students, 2 have 3 answers each, 1 have 2 answers, 1 have 0 answers.
+    # 2 reviewers per answer yield 16 review assignments
     event = PseudoMessage.new(@prepod, @chat, '/startreview')
     @handler.process_message(@api, event)
     response = @api.text!
 
     assert_includes response, 'Review assignment: 1'
-    assert_includes response, 'Review assignment: 18'
-    refute_includes response, 'Review assignment: 19'
+    assert_includes response, 'Review assignment: 16'
+    refute_includes response, 'Review assignment: 17'
+    assert_includes response, "#{@student1.id} : You was assigned review"
+    assert_includes response, "#{@student2.id} : You was assigned review"
+    assert_includes response, "#{@student3.id} : You was assigned review"
+
+    # no answers mean no review
+    refute_includes response, "#{@student4.id} : You was assigned review"
+
+    s1r = @dbl.reviews.get_review_assignments(@student1.id)
+
+    puts "After review assignment #{s1r}"
+    @dbl.dumpdb
 
     event = PseudoMessage.new(@student1, @chat, "/review 10 2 don't like it")
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "#{@student1.id} : Review assignment"
+    assert_includes response, "recorded/updated"
+    assert_includes response, "#{@student1.id} : You sent"
+
+    assert_equal 1, @dbl.reviews.tguser_reviews(@student1.id).size
 
     event = PseudoMessage.new(@student1, @chat, "/review 11 2 don't like it")
     @handler.process_message(@api, event)
     p @api.text!
 
+=begin
     event = PseudoMessage.new(@student1, @chat, "/review 12 2 don't like it")
     @handler.process_message(@api, event)
     p @api.text
@@ -445,6 +472,7 @@ describe 'Smoke' do
     event = PseudoMessage.new(@student3, @chat, '/review 6 10 like it')
     @handler.process_message(@api, event)
     p @api.text!
+=end
 
     # time to set grades
     event = PseudoMessage.new(@prepod, @chat, '/setgrades')
