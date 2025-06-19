@@ -50,21 +50,34 @@ end
 
 def main
   options = parse_options
-  Logger.set_verbose options[:verbose]
-  Handler.new(options[:dbname]) do |handler|
-    finish = false
-    first = true
-    Telegram::Bot::Client.run(options[:token]) do |bot|
+  Logger.set_verbose(options[:verbose])
+  
+  Telegram::Bot::Client.run(options[:token]) do |bot|
+    Handler.new(options[:dbname]) do |handler|
       bot.listen do |event|
-        finish = handler.process_message(bot.api, event) if event.class == Telegram::Bot::Types::Message
-        break if finish and !first
-
-        first = false
+        next unless event.is_a?(Telegram::Bot::Types::Message)
+        
+        begin
+          if handler.process_message(bot.api, event)
+            Logger.print("Received exit command, shutting down...")
+            break
+          end
+        rescue => e
+          Logger.error("Error processing message: #{e.message}")
+          bot.api.send_message(
+            chat_id: event.chat.id,
+            text: "Error processing message: #{e.message}"
+          )
+        end
       end
     end
   end
 rescue DBLayerError => e
-  puts "[[DBLayerError]] #{e}"
+  puts "[[DBLayerError]] #{e.message}"
+  Logger.error("Database error: #{e.backtrace.join("\n")}")
+rescue Telegram::Bot::Exceptions::ResponseError => e
+  puts "[[TelegramAPIError]] #{e.message}"
+  Logger.error("Telegram API error: #{e.response}")
 end
 
 # main program start

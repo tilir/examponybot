@@ -1,0 +1,16 @@
+AllCops:
+  TargetRubyVersion: 3.0
+  NewCops: enable
+  DisplayCopNames: true
+  Exclude:
+    - 'db/**/*'
+    - 'bin/*'
+    - 'vendor/**/*'
+
+Metrics/BlockLength:
+  Exclude:
+    - '**/*_test.rb'
+    - '**/*_smoke.rb'
+
+Style/Documentation:
+  Enabled: false

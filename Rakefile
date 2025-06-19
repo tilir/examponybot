@@ -1,5 +1,6 @@
 require 'find'
 require 'rake/testtask'
+require 'rubocop/rake_task'
 
 test_files = [
   'test/basic_smoke.rb',
@@ -56,5 +57,22 @@ task :group, [:group_name] do |t, args|
     system("bundle exec rake test TEST=#{file} TESTOPTS=\"--verbose --name='/#{group_name}/'\"")
   end
 end
+
+RuboCop::RakeTask.new(:lint) do |task|
+  task.options = ['--display-cop-names', '--extra-details']
+  task.fail_on_error = false
+end
+
+RuboCop::RakeTask.new(:lint_fix) do |task|
+  task.options = ['--auto-correct', '--extra-details']
+  task.fail_on_error = false
+end
+
+RuboCop::RakeTask.new(:lint_fix_aggressive) do |task|
+  task.options = ['--auto-correct-all', '--extra-details']
+  task.fail_on_error = false
+end
+
+task :ci => [:lint, :test]
 
 task default: :test
