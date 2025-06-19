@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'find'
 require 'rake/testtask'
 require 'rubocop/rake_task'
@@ -64,12 +66,12 @@ RuboCop::RakeTask.new(:lint) do |task|
 end
 
 RuboCop::RakeTask.new(:lint_fix) do |task|
-  task.options = ['--auto-correct', '--extra-details']
+  task.options = ['--autocorrect', '--extra-details']
   task.fail_on_error = false
 end
 
 RuboCop::RakeTask.new(:lint_fix_aggressive) do |task|
-  task.options = ['--auto-correct-all', '--extra-details']
+  task.options = ['--autocorrect-all', '--extra-details']
   task.fail_on_error = false
 end
 

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #------------------------------------------------------------------------------
 #
 # Telegram bot for peering exam on programming
@@ -57,7 +59,7 @@ class DBLayer
   attr_reader :users, :questions, :exams, :user_questions, :answers, :reviews
 
   def close
-    @db.close if @db
+    @db&.close
   end
 
   private
@@ -70,7 +72,7 @@ class DBLayer
   end
 
   def reconnect_database
-    @db.close if @db
+    @db&.close
     setup_database
   end
 
@@ -242,7 +244,7 @@ class ExamManager
   end
 
   def exams_empty?
-    @db.get_first_value('SELECT COUNT(*) FROM exams') == 0
+    @db.get_first_value('SELECT COUNT(*) FROM exams').zero?
   end
 
   def add_exam(name)

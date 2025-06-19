@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #------------------------------------------------------------------------------
 #
 # Telegram bot for peering exam on programming
@@ -100,14 +102,13 @@ class Question < DBQuestion
     if text
       # Create new question mode
       db_question = @db.questions.add_question(number, variant, text)
-      super(db_question.id, db_question.number, db_question.variant, db_question.question)
     else
       # Load existing question mode
       db_question = @db.questions.get_question(number, variant)
       raise "Question #{number}/#{variant} not found" unless db_question
 
-      super(db_question.id, db_question.number, db_question.variant, db_question.question)
     end
+    super(db_question.id, db_question.number, db_question.variant, db_question.question)
   end
 
   def to_s

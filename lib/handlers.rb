@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #------------------------------------------------------------------------------
 #
 # Telegram bot for peering exam on programming
@@ -199,60 +201,6 @@ class Handler
   end
 
   class PrivilegedCommand < Command
-    # utils
-    private def qualify_users(api, tguser, userreq)
-      allu = @dbl.answers.all_answered_users
-      if allu.nil?
-        api.send_message(chat_id: tguser.id, text: 'No answered users yet')
-        return []
-      end
-
-      qualified = []
-      allu.each do |dbuser|
-        user = User.from_db_user(@dbl, dbuser)
-        userrevs = user.review_count
-        if userrevs < userreq
-          txt = <<~TXT
-            You haven't done your reviewing due.
-            Done #{userrevs} of #{userreq}
-            You will not be graded
-          TXT
-          api.send_message(chat_id: user.userid, text: txt)
-          next
-        end
-        qualified.append(user)
-      end
-      qualified
-    end
-
-    private def grade_answer(allrevs)
-      grade = 0
-      allrevs.each do |rev|
-        grade += rev.grade
-      end
-      (grade.to_f / allrevs.length).round
-    end
-
-    private def send_reviewing_task(api, _tguser, dbuser, reviewer)
-      student = User.from_db_user(@dbl, dbuser)
-      answs = student.all_answers
-      Logger.print "got #{answs.length} answers to review from #{student.userid}"
-
-      answs.each do |ans|
-        review = UserReview.new(@dbl, reviewer.id, ans.uqid)
-        qst = ans.to_question
-        txt = <<~TXT
-          Review assignment: #{review.id}
-          --- Question ---
-          #{qst.question}
-          --- Answer ---
-          #{ans.text}
-        TXT
-        api.send_message(chat_id: reviewer.userid, text: txt)
-        Logger.print "Assigned review #{review.id} to #{reviewer.userid}"
-      end
-    end
-
     # iterface
     def users
       allu = @dbl.users.all
@@ -408,7 +356,63 @@ class Handler
       true
     end
 
-    private def print_help
+    private
+
+    # utils
+    def qualify_users(api, tguser, userreq)
+      allu = @dbl.answers.all_answered_users
+      if allu.nil?
+        api.send_message(chat_id: tguser.id, text: 'No answered users yet')
+        return []
+      end
+
+      qualified = []
+      allu.each do |dbuser|
+        user = User.from_db_user(@dbl, dbuser)
+        userrevs = user.review_count
+        if userrevs < userreq
+          txt = <<~TXT
+            You haven't done your reviewing due.
+            Done #{userrevs} of #{userreq}
+            You will not be graded
+          TXT
+          api.send_message(chat_id: user.userid, text: txt)
+          next
+        end
+        qualified.append(user)
+      end
+      qualified
+    end
+
+    def grade_answer(allrevs)
+      grade = 0
+      allrevs.each do |rev|
+        grade += rev.grade
+      end
+      (grade.to_f / allrevs.length).round
+    end
+
+    def send_reviewing_task(api, _tguser, dbuser, reviewer)
+      student = User.from_db_user(@dbl, dbuser)
+      answs = student.all_answers
+      Logger.print "got #{answs.length} answers to review from #{student.userid}"
+
+      answs.each do |ans|
+        review = UserReview.new(@dbl, reviewer.id, ans.uqid)
+        qst = ans.to_question
+        txt = <<~TXT
+          Review assignment: #{review.id}
+          --- Question ---
+          #{qst.question}
+          --- Answer ---
+          #{ans.text}
+        TXT
+        api.send_message(chat_id: reviewer.userid, text: txt)
+        Logger.print "Assigned review #{review.id} to #{reviewer.userid}"
+      end
+    end
+
+    def print_help
       <<~HELP
         /addquestion n v text
         /questions
@@ -425,16 +429,6 @@ class Handler
   end
 
   class NonPrivilegedCommand < Command
-    private def check_question_number(n)
-      nn = @dbl.questions.n_questions
-      if (n > nn) or (n < 1)
-        @api.send_message(chat_id: @tguser.id,
-                          text: "Question have incorrect number #{n}. Allowed range: [1 .. #{nn}].")
-        return false
-      end
-      true
-    end
-
     def answer(rest = '')
       exam = Exam.new(@dbl, 'exam')
       if exam.state != :answering
@@ -531,7 +525,7 @@ class Handler
       g = m[2].to_i
       t = m[3]
 
-      if g < 1 or g > 10
+      if (g < 1) || (g > 10)
         @api.send_message(chat_id: @tguser.id, text: 'Grade shall be 1 .. 10')
         return
       end
@@ -571,7 +565,19 @@ class Handler
       @api.send_message(chat_id: @tguser.id, text: "#{urid} review info. Grade: #{review.grade}. Text: #{review.text}")
     end
 
-    private def print_help
+    private
+
+    def check_question_number(n)
+      nn = @dbl.questions.n_questions
+      if (n > nn) || (n < 1)
+        @api.send_message(chat_id: @tguser.id,
+                          text: "Question have incorrect number #{n}. Allowed range: [1 .. #{nn}].")
+        return false
+      end
+      true
+    end
+
+    def print_help
       <<~HELP
         /register [name] -- change your name.
         /answer n text -- send answer to nth question in your exam ticket. Text can be multi-line.
@@ -581,14 +587,6 @@ class Handler
         /lookup_review r -- lookup your review assignment in r's review.
       HELP
     end
-  end
-
-  private def get_command(api, tguser)
-    dbuser = User.new(@dbl, tguser.id)
-    return Command.new(api, tguser, @dbl) if dbuser.level == :nonexistent
-    return PrivilegedCommand.new(api, tguser, @dbl) if dbuser.level == :privileged
-
-    NonPrivilegedCommand.new(api, tguser, @dbl)
   end
 
   # returns true if we need to exit
@@ -615,5 +613,15 @@ class Handler
 
   def shutdown
     @dbl.close
+  end
+
+  private
+
+  def get_command(api, tguser)
+    dbuser = User.new(@dbl, tguser.id)
+    return Command.new(api, tguser, @dbl) if dbuser.level == :nonexistent
+    return PrivilegedCommand.new(api, tguser, @dbl) if dbuser.level == :privileged
+
+    NonPrivilegedCommand.new(api, tguser, @dbl)
   end
 end

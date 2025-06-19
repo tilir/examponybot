@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #------------------------------------------------------------------------------
 #
 # Telegram bot for peering exam on programming
@@ -16,7 +18,7 @@ require 'pseudoapi'
 
 Minitest::Reporters.use! Minitest::Reporters::SpecReporter.new
 
-DB_PATH = 'smoke.db'.freeze
+DB_PATH = 'smoke.db'
 
 module PonyBotTestHelper
   def setup_test_env
@@ -40,6 +42,8 @@ module PonyBotTestHelper
   end
 end
 
-class Minitest::Spec
-  include PonyBotTestHelper
+module Minitest
+  class Spec
+    include PonyBotTestHelper
+  end
 end

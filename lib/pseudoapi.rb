@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #------------------------------------------------------------------------------
 #
 # Telegram bot for peering exam on programming
@@ -19,11 +21,11 @@ class PseudoApi
   attr_reader :text
 
   def initialize
-    @text = ''
+    @text = String.new
   end
 
   def text!
-    @text.tap { @text = '' }
+    @text.tap { @text = String.new }
   end
 
   def send_message(chat_id:, text:)
