@@ -230,9 +230,10 @@ class Handler
       (grade.to_f / allrevs.length).round
     end
 
-    private def send_reviewing_task(api, _tguser, student, reviewer)
+    private def send_reviewing_task(api, tguser, dbuser, reviewer)
+      student = User.from_db_user(@dbl, dbuser)
       answs = student.all_answers
-      p "got #{answs.length} answers to review from #{student.userid}"
+      Logger.print "got #{answs.length} answers to review from #{student.userid}"
 
       answs.each do |ans|
         review = UserReview.new(@dbl, reviewer.id, ans.uqid)
@@ -245,6 +246,7 @@ class Handler
           #{ans.text}
         TXT
         api.send_message(chat_id: reviewer.userid, text: txt)
+        Logger.print "Assigned review #{review.id} to #{reviewer.userid}"
       end
     end
 
@@ -456,6 +458,7 @@ class Handler
       end
       
       answ = @dbl.answers.create_or_update(uqst.id, t)
+      raise "uqid changed in process" unless answ.user_question_id == uqst.id
       @api.send_message(chat_id: @tguser.id, text: "Answer recorded to #{uqst.id}")
     end
 

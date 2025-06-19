@@ -192,6 +192,7 @@ describe "Smoke" do
       assert_includes response, fragment
     end
 
+    # first student response
     event = PseudoMessage.new(@student1, @chat, '/answer 1 singleline from student1')
     @handler.process_message(@api, event)
     response = @api.text!
@@ -200,6 +201,7 @@ describe "Smoke" do
     dbuser1 = @dbl.users.get_user_by_id(@student1.id)
     refute @dbl.answers.user_all_answers(dbuser1.id).empty?
 
+    # second student response
     event = PseudoMessage.new(@student2, @chat, '/answer 1 singleline from student2')
     @handler.process_message(@api, event)
     response = @api.text!
@@ -208,31 +210,52 @@ describe "Smoke" do
     dbuser2 = @dbl.users.get_user_by_id(@student2.id)
     refute @dbl.answers.user_all_answers(dbuser2.id).empty?
 
+    # third student response
     event = PseudoMessage.new(@student3, @chat, '/answer 1 singleline from student3')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
 
-=begin
+    dbuser3 = @dbl.users.get_user_by_id(@student3.id)
+    refute @dbl.answers.user_all_answers(dbuser3.id).empty?
+    assert_includes response, "#{@student3.id} : Answer recorded to"
+
+    # student lookup for reponse
     event = PseudoMessage.new(@student3, @chat, '/lookup_answer 1')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "#{@student3.id} : singleline from student3"
 
+    # student lookup for non-existent reponse
     event = PseudoMessage.new(@student3, @chat, '/lookup_answer 2')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "#{@student3.id} : You haven't answered yet"
 
+    # first student response again
     a21 = <<~ANS
       /answer 2
       УХ
       как я
       отвечаю
     ANS
+
+    event = PseudoMessage.new(@student1, @chat, a21)
+    @handler.process_message(@api, event)
+    response = @api.text!
+    assert_includes response, "#{@student1.id} : Answer recorded to"
+
     a22 = <<~ANS
       /answer 2
       ЭХ
       как я
       отвечаю
     ANS
+
+    event = PseudoMessage.new(@student2, @chat, a22)
+    @handler.process_message(@api, event)
+    response = @api.text!
+    assert_includes response, "#{@student2.id} : Answer recorded to"
+
     a23 = <<~ANS
       /answer 2
       ЫХ
@@ -240,50 +263,63 @@ describe "Smoke" do
       отвечаю
     ANS
 
-    event = PseudoMessage.new(@student1, @chat, a21)
-    @handler.process_message(@api, event)
-    p @api.text!
-
-    event = PseudoMessage.new(@student2, @chat, a22)
-    @handler.process_message(@api, event)
-    p @api.text!
-
     event = PseudoMessage.new(@student3, @chat, a23)
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "#{@student3.id} : Answer recorded to"
 
+    # student lookup for now existing reponse
     event = PseudoMessage.new(@student3, @chat, '/lookup_answer 2')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "#{@student3.id} : ЫХ"
 
+    # student lookup for answer without number
     event = PseudoMessage.new(@student3, @chat, '/lookup_answer')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "#{@student3.id} : Question have incorrect number 0. Allowed range: [1 .. 3]"
 
+    # student lookup for question (assigned randomly so just smoke here)
     event = PseudoMessage.new(@student3, @chat, '/lookup_question 1')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "#{@student3.id} : "
 
+    # student lookup for question without number
     event = PseudoMessage.new(@student3, @chat, '/lookup_question')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "#{@student3.id} : Question have incorrect number 0. Allowed range: [1 .. 3]"
 
+    # first student response again
     event = PseudoMessage.new(@student1, @chat, '/answer 3 singleline from student1')
     @handler.process_message(@api, event)
-    p @api.text
+    response = @api.text!
+    assert_includes response, "#{@student1.id} : Answer recorded to"
 
+    # second student response again
     event = PseudoMessage.new(@student2, @chat, '/answer 3 singleline from student2')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "#{@student2.id} : Answer recorded to"
 
+    # third student response again
     event = PseudoMessage.new(@student3, @chat, '/answer 3 singleline from student3')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "#{@student3.id} : Answer recorded to"
 
+    # create review assignments
+    # we have 3 students, 3 answers each, 2 reviewers per answer yield 18 review assignments
     event = PseudoMessage.new(@prepod, @chat, '/startreview')
     @handler.process_message(@api, event)
-    p @api.text!
+    response = @api.text!
+    assert_includes response, "Review assignment: 1"
+    assert_includes response, "Review assignment: 18"
+    refute_includes response, "Review assignment: 19"
 
+=begin
     event = PseudoMessage.new(@student1, @chat, "/review 10 2 don't like it")
     @handler.process_message(@api, event)
     p @api.text!
@@ -375,14 +411,17 @@ describe "Smoke" do
     event = PseudoMessage.new(@student3, @chat, '/review 6 10 like it')
     @handler.process_message(@api, event)
     p @api.text!
+=end
 
+    # time to set grades
     event = PseudoMessage.new(@prepod, @chat, '/setgrades')
     @handler.process_message(@api, event)
     p @api.text!
 
+    # finish
     event = PseudoMessage.new(@prepod, @chat, '/stopexam')
     @handler.process_message(@api, event)
-    p @api.text!
-=end
+    response = @api.text!
+    assert_includes response, "Exam stopped"
   end
 end
