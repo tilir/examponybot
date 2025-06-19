@@ -30,7 +30,7 @@ describe Handler::Command do
   end
 
   it 'registers the first user as privileged' do
-    assert dbl.users.users_empty?
+    assert_predicate dbl.users, :users_empty?
     mock_api = Minitest::Mock.new
     cmd = Handler::Command.new(mock_api, tguser, dbl)
     mock_api.expect(:send_message, nil) do |h|
@@ -42,6 +42,7 @@ describe Handler::Command do
     cmd.register('Test Name')
 
     dbuser = dbl.users.get_user_by_id(tguser.id)
+
     assert_equal :privileged, UserStates.to_sym(dbuser.privlevel)
     assert_equal 'Test Name', dbuser.username
     mock_api.verify
@@ -62,6 +63,7 @@ describe Handler::Command do
     Handler::Command.new(mock_api, tguser2, dbl).register('XXX')
 
     dbuser = dbl.users.get_user_by_id(tguser2.id)
+
     assert_equal :regular, UserStates.to_sym(dbuser.privlevel)
     mock_api.verify
   end
@@ -89,6 +91,7 @@ describe Handler::Command do
 
     cmd = Handler::Command.new(mock_api, tguser_no_username, dbl)
     cmd.register
+
     assert_equal '123', dbl.users.get_user_by_id(tguser.id).username
     mock_api.verify
   end
@@ -105,11 +108,12 @@ describe Handler::Command do
 
     assert_equal 2, dbl.questions.n_questions
     assert_equal 2, dbl.questions.n_variants
-    assert dbl.exams.any?
+    assert_predicate dbl.exams, :any?
     assert(dbl.users.all_nonpriv.any? { |u| u.userid == user.userid })
 
     exam = Exam.new(dbl, 'exam')
-    refute exam.state == :stopped
+
+    refute_equal exam.state, :stopped
 
     mock_api = Minitest::Mock.new
     mock_api.expect(:send_message, nil) do |h|

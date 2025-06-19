@@ -11,7 +11,7 @@
 #
 #------------------------------------------------------------------------------
 
-require_relative './dblayer'
+require_relative 'dblayer'
 
 N_REVIEWERS = 2
 
@@ -88,13 +88,13 @@ class Handler
     end
 
     def update_existing_user(user, userid, name)
-      if user.username != name
+      if user.username == name
+        log_already_registered(userid, name)
+        nil
+      else
         User.new(@dbl, userid, :regular, name).tap do
           log_name_change(userid, user.username, name)
         end
-      else
-        log_already_registered(userid, name)
-        nil
       end
     end
 

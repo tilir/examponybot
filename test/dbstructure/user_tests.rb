@@ -83,6 +83,7 @@ describe User do
       # Verify database interaction
       assert_equal 1, db.users.all_users.size
       db_record = db.users.all_users.first
+
       assert_equal user_id, db_record.userid
       assert_equal username, db_record.username
       assert_equal UserStates.to_i(privilege_level), db_record.privlevel
@@ -92,7 +93,7 @@ describe User do
       assert_equal user_id, user.userid
       assert_equal username, user.username
       assert_equal privilege_level, user.level
-      assert user.regular?
+      assert_predicate user, :regular?
     end
   end
 
@@ -111,7 +112,7 @@ describe User do
       assert_equal @existing_record.id, user.id
       assert_equal 'Bob', user.username
       assert_equal :privileged, user.level
-      assert user.privileged?
+      assert_predicate user, :privileged?
     end
   end
 
@@ -122,9 +123,9 @@ describe User do
 
       # Verify
       assert_equal :nonexistent, user.level
-      assert user.nonexistent?
-      refute user.regular?
-      refute user.privileged?
+      assert_predicate user, :nonexistent?
+      refute_predicate user, :regular?
+      refute_predicate user, :privileged?
     end
   end
 
@@ -132,18 +133,21 @@ describe User do
     it 'correctly identifies all user states' do
       # Privileged user
       privileged = User.new(db, 1, :privileged, 'Admin')
-      assert privileged.privileged?
-      refute privileged.regular?
+
+      assert_predicate privileged, :privileged?
+      refute_predicate privileged, :regular?
 
       # Regular user
       regular = User.new(db, 2, :regular, 'Regular')
-      assert regular.regular?
-      refute regular.privileged?
-      refute regular.nonexistent?
+
+      assert_predicate regular, :regular?
+      refute_predicate regular, :privileged?
+      refute_predicate regular, :nonexistent?
 
       # Nonexistent user
       nonexistent = User.new(db, 999)
-      assert nonexistent.nonexistent?
+
+      assert_predicate nonexistent, :nonexistent?
     end
   end
 end

@@ -1,13 +1,25 @@
+plugins:
+  - rubocop-minitest
+  - rubocop-rake
+
 AllCops:
   TargetRubyVersion: 3.0
   NewCops: enable
   DisplayCopNames: true
   Exclude:
+    - 'hello/**/*'
     - 'db/**/*'
     - 'bin/*'
     - 'vendor/**/*'
 
+Minitest:
+  Enabled: true
+
+Rake:
+  Enabled: true
+
 Metrics/BlockLength:
+  Max: 300
   Exclude:
     - '**/*_test.rb'
     - '**/*_smoke.rb'

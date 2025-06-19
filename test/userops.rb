@@ -29,9 +29,11 @@ describe 'User Operations' do
   describe 'User creation' do
     it 'adds new user and can retrieve it' do
       user = User.new(@db, 100, UserStates.to_i(:regular), 'User100')
+
       refute_nil user.id
 
       found = @db.users.get_user_by_id(100)
+
       assert_equal 100, found.userid
       assert_equal 'User100', found.username
       assert_equal UserStates.to_i(:regular), found.privlevel
@@ -43,7 +45,7 @@ describe 'User Operations' do
 
       assert_equal user1.id, user2.id
       assert_equal 'User101Updated', user2.username
-      refute user2.regular?
+      refute_predicate user2, :regular?
     end
 
     it 'handles long usernames' do
@@ -51,6 +53,7 @@ describe 'User Operations' do
       user = User.new(@db, 350, UserStates.to_i(:regular), long_name)
 
       found = @db.users.get_user_by_id(350)
+
       assert_equal long_name, found.username
       assert_equal long_name, user.username
     end
@@ -60,6 +63,7 @@ describe 'User Operations' do
       user = User.new(@db, 360, UserStates.to_i(:regular), special_name)
 
       found = @db.users.get_user_by_id(360)
+
       assert_equal special_name, found.username
       assert_equal special_name, user.username
     end
@@ -78,6 +82,7 @@ describe 'User Operations' do
 
     it 'finds existing user' do
       found = @db.users.get_user_by_id(400)
+
       assert_equal @user.id, found.id
       assert_equal 'User400', found.username
     end
@@ -96,18 +101,21 @@ describe 'User Operations' do
 
     it 'checks empty state' do
       new_db = DBLayer.new(':memory:')
-      assert new_db.users.empty?
+
+      assert_empty new_db.users
       new_db.close
     end
 
     it 'lists all users' do
       users = @db.users.all
+
       assert_equal 2, users.size
       assert_equal [500, 501], users.map(&:userid).sort
     end
 
     it 'filters non-privileged users' do
       nonpriv = @db.users.all_nonpriv
+
       assert_equal 1, nonpriv.size
       assert_equal 500, nonpriv.first.userid
     end

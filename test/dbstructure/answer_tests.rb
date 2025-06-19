@@ -53,6 +53,7 @@ describe 'UserQuestion and Answer Integration' do
 
       # Exercise/Verify
       uq = UserQuestion.new(db, exam_id, user_id, question_id)
+
       assert_nil uq.answer
       db.verify
     end

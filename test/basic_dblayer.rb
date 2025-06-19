@@ -26,9 +26,11 @@ describe 'Database Layer' do
   describe 'User operations' do
     it 'adds and retrieves a user' do
       user = User.new(@db, 123, UserStates.to_i(:regular), 'Alice')
-      assert user.id.is_a?(Integer)
+
+      assert_kind_of Integer, user.id
 
       found = @db.users.get_user_by_id(123)
+
       assert_equal 'Alice', found.username
       assert_equal UserStates.to_i(:regular), found.privlevel
     end
@@ -39,7 +41,7 @@ describe 'Database Layer' do
 
       assert_equal user1.id, user2.id
       assert_equal 'Alice Updated', user2.username
-      assert user2.privileged?
+      assert_predicate user2, :privileged?
     end
   end
 
@@ -63,9 +65,11 @@ describe 'Database Layer' do
   describe 'Exam operations' do
     it 'creates and manages exams' do
       exam = Exam.new(@db, 'Final Exam')
+
       assert_equal :stopped, exam.state
 
       exam.set_state(:answering)
+
       assert_equal :answering, exam.state
     end
   end
@@ -79,6 +83,7 @@ describe 'Database Layer' do
 
     it 'links user with question' do
       uq = UserQuestion.new(@db, @exam.id, @user.id, @question.id)
+
       assert_equal @question.id, uq.question_id
     end
 
@@ -100,9 +105,11 @@ describe 'Database Layer' do
 
     it 'records and finds answers' do
       answer = Answer.new(@db, @uq.id, '42')
+
       assert_equal '42', answer.text
 
       found = @db.answers.find_by_user_question(@uq.id)
+
       assert_equal answer.answer, found.answer
     end
   end
@@ -119,14 +126,17 @@ describe 'Database Layer' do
 
     it 'creates and queries reviews' do
       review = Review.new(@db, @assignment.id, 5, 'Good work')
+
       assert_equal 5, review.grade
 
       found = @db.reviews.query_review(@assignment.id)
+
       assert_equal review.text, found.review
     end
 
     it 'counts reviews per reviewer' do
       Review.new(@db, @assignment.id, 4, 'Not bad')
+
       assert_equal 1, @db.reviews.nreviews(@assignment.reviewer_id)
     end
   end

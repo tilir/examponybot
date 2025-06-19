@@ -17,7 +17,7 @@
 require 'bundler/setup'
 require 'optparse'
 require 'telegram/bot'
-require_relative './lib/handlers'
+require_relative 'lib/handlers'
 
 def parse_options
   options = {}
