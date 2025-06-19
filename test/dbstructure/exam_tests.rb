@@ -17,11 +17,11 @@ require 'dbstructure'
 describe Exam do
   let(:db) { Minitest::Mock.new }
   let(:exam_id) { 42 }
-  let(:exam_name) { "exam" }
+  let(:exam_name) { 'exam' }
   let(:initial_state) { ExamStates.to_i(:stopped) }
 
-  describe "Exam initialization" do
-    it "creates exam with correct attributes" do
+  describe 'Exam initialization' do
+    it 'creates exam with correct attributes' do
       # Setup mock expectations
       db.expect(:nil?, false)
       db.expect(:empty?, true)
@@ -29,8 +29,8 @@ describe Exam do
       db.expect(:exams, db)
       db.expect(:exams, db)
       db.expect(:find_by_name, nil, [exam_name])
-      db.expect(:add_exam, 
-                DBExam.new(exam_id, initial_state, exam_name), 
+      db.expect(:add_exam,
+                DBExam.new(exam_id, initial_state, exam_name),
                 [exam_name])
 
       # Exercise
@@ -44,8 +44,8 @@ describe Exam do
     end
   end
 
-  describe "string representation" do
-    it "returns formatted exam details" do
+  describe 'string representation' do
+    it 'returns formatted exam details' do
       # Setup
       db.expect(:nil?, false)
       db.expect(:empty?, true)
@@ -53,8 +53,8 @@ describe Exam do
       db.expect(:exams, db)
       db.expect(:exams, db)
       db.expect(:find_by_name, nil, [exam_name])
-      db.expect(:add_exam, 
-                DBExam.new(exam_id, initial_state, exam_name), 
+      db.expect(:add_exam,
+                DBExam.new(exam_id, initial_state, exam_name),
                 [exam_name])
 
       exam = Exam.new(db, exam_name)
@@ -73,18 +73,18 @@ describe Exam do
     end
   end
 
-  describe "exam creation constraints" do
-    it "prevents creating multiple exams" do
+  describe 'exam creation constraints' do
+    it 'prevents creating multiple exams' do
       # First exam should succeed
       db.expect(:exams, db)
       db.expect(:exams, db)
       db.expect(:exams, db)
       db.expect(:nil?, false)
       db.expect(:empty?, true)
-      db.expect(:find_by_name, nil, ["First Exam"])
-      db.expect(:add_exam, DBExam.new(1, 0, "First Exam"), ["First Exam"])
+      db.expect(:find_by_name, nil, ['First Exam'])
+      db.expect(:add_exam, DBExam.new(1, 0, 'First Exam'), ['First Exam'])
 
-      Exam.new(db, "First Exam")
+      Exam.new(db, 'First Exam')
 
       # Second exam should fail
       # db.expect(:exams, db)

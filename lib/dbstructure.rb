@@ -23,7 +23,7 @@ class User < DBUser
     raise ArgumentError, 'DB layer must be provided' if db_layer.nil?
     raise ArgumentError, 'DBUser must be provided' if db_user.nil?
 
-    user = allocate  # Создаем неинициализированный объект
+    user = allocate # Создаем неинициализированный объект
     user.instance_variable_set(:@db, db_layer)
     user.instance_variable_set(:@id, db_user.id)
     user.instance_variable_set(:@userid, db_user.userid)
@@ -34,8 +34,9 @@ class User < DBUser
 
   def initialize(db_layer, userid, privlevel = nil, username = nil)
     raise ArgumentError, 'db_layer and userid shall not be nil' if db_layer.nil? || userid.nil?
+
     @db = db_layer
-    
+
     if username && privlevel
       # Create new user mode
       privlevel = UserStates.to_i(privlevel) if privlevel.is_a?(Symbol)
@@ -59,9 +60,9 @@ class User < DBUser
   def nth_question(exam_id, question_number)
     Logger.print("Query nth question: #{exam_id}, #{id}, #{question_number}")
     uq = @db.user_questions.user_nth_question(exam_id, id, question_number)
-    raise "uq.user_id shall be equal to user id" unless id == uq.user_id
+    raise 'uq.user_id shall be equal to user id' unless id == uq.user_id
     return nil unless uq
-    
+
     Logger.print("Got nth question: #{uq.exam_id}, #{uq.user_id}, #{uq.question_id}")
     UserQuestion.new(@db, uq.exam_id, uq.user_id, uq.question_id)
   end
@@ -89,13 +90,13 @@ class User < DBUser
     USER_INFO
   end
 
-  alias_method :name, :username
+  alias name username
 end
 
 class Question < DBQuestion
   def initialize(db_layer, number, variant, text = nil)
     @db = db_layer
-    
+
     if text
       # Create new question mode
       db_question = @db.questions.add_question(number, variant, text)
@@ -104,6 +105,7 @@ class Question < DBQuestion
       # Load existing question mode
       db_question = @db.questions.get_question(number, variant)
       raise "Question #{number}/#{variant} not found" unless db_question
+
       super(db_question.id, db_question.number, db_question.variant, db_question.question)
     end
   end
@@ -118,7 +120,7 @@ class Question < DBQuestion
   end
 
   # Alias for backward compatibility
-  alias_method :text, :question
+  alias text question
 end
 
 class Exam < DBExam
@@ -127,18 +129,19 @@ class Exam < DBExam
     raise ArgumentError, 'Exam name must be provided' if name.nil? || name.empty?
 
     @db = db_layer
-    
+
     # First try to find existing exam
     db_exam = @db.exams.find_by_name(name)
-    
+
     # If not found - create new one
-    unless db_exam
-      Logger.print "Adding new exam #{name}"
-      raise "Currently only single exam supported" unless @db.exams.empty?
-      db_exam = @db.exams.add_exam(name)
-      raise "Exam creation failed" unless db_exam
-    else
+    if db_exam
       Logger.print "Found existing exam #{name}"
+    else
+      Logger.print "Adding new exam #{name}"
+      raise 'Currently only single exam supported' unless @db.exams.empty?
+
+      db_exam = @db.exams.add_exam(name)
+      raise 'Exam creation failed' unless db_exam
     end
 
     # Initialize parent class
@@ -194,22 +197,22 @@ class UserQuestion < DBUserQuestion
   end
 
   # Just compatibility
-  alias_method :examid, :exam_id
-  alias_method :userid, :user_id
-  alias_method :questionid, :question_id
-  alias_method :to_answer, :answer
-  alias_method :to_question, :question
+  alias examid exam_id
+  alias userid user_id
+  alias questionid question_id
+  alias to_answer answer
+  alias to_question question
 end
 
 class Answer < DBAnswer
   def initialize(db_layer, uqid, text = nil)
     @db = db_layer
-    
-    db_answer = 
+
+    db_answer =
       if text
         @db.answers.create_or_update(uqid, text)
       else
-        @db.answers.find_by_user_question(uqid) || 
+        @db.answers.find_by_user_question(uqid) ||
           raise("Answer not found for UQID #{uqid}")
       end
 
@@ -219,8 +222,8 @@ class Answer < DBAnswer
 
   def question
     user_question = @db.answers.find_by_answer(id)
-    raise "Answer not registered" unless user_question
-    
+    raise 'Answer not registered' unless user_question
+
     user_question.question
   end
 
@@ -237,10 +240,10 @@ class Answer < DBAnswer
   end
 
   # Just compatibility
-  alias_method :to_question, :question
-  alias_method :all_reviews, :reviews
-  alias_method :text, :answer
-  alias_method :uqid, :user_question_id
+  alias to_question question
+  alias all_reviews reviews
+  alias text answer
+  alias uqid user_question_id
 end
 
 class UserReview < DBUserReview
@@ -251,8 +254,8 @@ class UserReview < DBUserReview
   end
 
   # Для совместимости
-  alias_method :userid, :reviewer_id
-  alias_method :userquestionid, :user_question_id
+  alias userid reviewer_id
+  alias userquestionid user_question_id
 
   def to_s
     <<~TEXT.chomp
@@ -266,12 +269,12 @@ end
 class Review < DBReview
   def initialize(db_layer, review_assignment_id, grade = nil, text = nil)
     @db = db_layer
-    
+
     db_review = if grade && text
                   @db.reviews.submit(review_assignment_id, grade, text)
                 else
                   @db.reviews.find_by_assignment(review_assignment_id) ||
-                  raise("Review not found for assignment #{review_assignment_id}")
+                    raise("Review not found for assignment #{review_assignment_id}")
                 end
 
     # Инициализируем родительский класс
@@ -287,6 +290,6 @@ class Review < DBReview
     TEXT
   end
 
-  alias_method :revid, :user_review_id
-  alias_method :text, :review
+  alias revid user_review_id
+  alias text review
 end

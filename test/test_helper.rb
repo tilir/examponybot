@@ -22,11 +22,11 @@ module PonyBotTestHelper
   def setup_test_env
     @handler = Handler.new(DB_PATH)
     @dbl = @handler.dbl
-    @api = PseudoApi.new    
+    @api = PseudoApi.new
     @prepod = PseudoTGUser.new(167_346_988, 'Tilir')
-    @student1 = PseudoTGUser.new(10002, 'student1')
-    @student2 = PseudoTGUser.new(10003, 'student2')
-    @student3 = PseudoTGUser.new(10004, 'student3')
+    @student1 = PseudoTGUser.new(10_002, 'student1')
+    @student2 = PseudoTGUser.new(10_003, 'student2')
+    @student3 = PseudoTGUser.new(10_004, 'student3')
     @chat = PseudoChat.new(1)
   end
 

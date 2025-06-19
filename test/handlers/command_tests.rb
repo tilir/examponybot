@@ -29,7 +29,7 @@ describe Handler::Command do
 
   it 'registers the first user as privileged' do
     assert dbl.users.users_empty?
-    mock_api = Minitest::Mock.new    
+    mock_api = Minitest::Mock.new
     cmd = Handler::Command.new(mock_api, tguser, dbl)
     mock_api.expect(:send_message, nil) do |h|
       # puts ""
@@ -103,8 +103,8 @@ describe Handler::Command do
 
     assert_equal 2, dbl.questions.n_questions
     assert_equal 2, dbl.questions.n_variants
-    assert dbl.exams.any? 
-    assert dbl.users.all_nonpriv.any? { |u| u.userid == user.userid }
+    assert dbl.exams.any?
+    assert(dbl.users.all_nonpriv.any? { |u| u.userid == user.userid })
 
     exam = Exam.new(dbl, 'exam')
     refute exam.state == :stopped
@@ -124,4 +124,3 @@ describe Handler::Command do
     cmd.register
   end
 end
-

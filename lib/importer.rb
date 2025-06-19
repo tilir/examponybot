@@ -29,14 +29,10 @@ class QuestionImporter
   def import!
     grouped_questions = parse_file(@filename)
 
-    if grouped_questions.empty? || grouped_questions.all?(&:empty?)
-      raise "Error: no question group found"
-    end
+    raise 'Error: no question group found' if grouped_questions.empty? || grouped_questions.all?(&:empty?)
 
     question_counts = grouped_questions.map(&:size).uniq
-    if question_counts.size > 1
-      raise "Error counts differ: #{question_counts.join(', ')}"
-    end
+    raise "Error counts differ: #{question_counts.join(', ')}" if question_counts.size > 1
 
     grouped_questions.each_with_index do |questions, grp_index|
       group_id = grp_index + 1

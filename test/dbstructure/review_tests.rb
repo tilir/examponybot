@@ -14,17 +14,17 @@ require 'minitest/spec'
 require 'minitest/mock'
 require 'dbstructure'
 
-describe "Review System" do
+describe 'Review System' do
   let(:db) { Minitest::Mock.new }
   let(:reviewer_id) { 1 }
   let(:user_question_id) { 42 }
   let(:review_assignment_id) { 100 }
   let(:review_id) { 99 }
   let(:grade) { 5 }
-  let(:review_text) { "Excellent work" }
+  let(:review_text) { 'Excellent work' }
 
   describe UserReview do
-    it "creates new review assignment successfully" do
+    it 'creates new review assignment successfully' do
       # Setup mock
       db.expect(:reviews, db)
       db.expect(:assign_reviewer,
@@ -41,10 +41,10 @@ describe "Review System" do
       db.verify
     end
 
-    it "generates proper string representation" do
+    it 'generates proper string representation' do
       # Setup
       db.expect(:reviews, db)
-      db.expect(:assign_reviewer, 
+      db.expect(:assign_reviewer,
                 DBUserReview.new(review_assignment_id, reviewer_id, user_question_id),
                 [reviewer_id, user_question_id])
 
@@ -60,8 +60,8 @@ describe "Review System" do
   end
 
   describe Review do
-    describe "creating new review" do
-      it "records review with grade and feedback" do
+    describe 'creating new review' do
+      it 'records review with grade and feedback' do
         # Setup
         db.expect(:reviews, db)
         db.expect(:submit,
@@ -79,8 +79,8 @@ describe "Review System" do
       end
     end
 
-    describe "loading existing review" do
-      it "retrieves review details from database" do
+    describe 'loading existing review' do
+      it 'retrieves review details from database' do
         # Setup
         db.expect(:reviews, db)
         db.expect(:find_by_assignment,
@@ -96,20 +96,20 @@ describe "Review System" do
         db.verify
       end
 
-      it "raises error when review not found" do
+      it 'raises error when review not found' do
         # Setup
         db.expect(:reviews, db)
         db.expect(:find_by_assignment, nil, [review_assignment_id])
 
         # Exercise/Verify
-        assert_raises("Review not found") do
+        assert_raises('Review not found') do
           Review.new(db, review_assignment_id)
         end
         db.verify
       end
     end
 
-    it "generates correct string representation" do
+    it 'generates correct string representation' do
       # Setup
       db.expect(:reviews, db)
       db.expect(:submit,

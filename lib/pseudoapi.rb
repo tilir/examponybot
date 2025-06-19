@@ -17,13 +17,13 @@ Logger.set_verbose(false)
 
 class PseudoApi
   attr_reader :text
-  
+
   def initialize
-    @text = ""
+    @text = ''
   end
-  
+
   def text!
-    @text.tap { @text = "" }
+    @text.tap { @text = '' }
   end
 
   def send_message(chat_id:, text:)
@@ -33,8 +33,8 @@ class PseudoApi
 end
 
 class PseudoTGUser
-  attr_accessor :id
-  attr_accessor :username
+  attr_accessor :id, :username
+
   def initialize(id, username)
     @id = id
     @username = username
@@ -43,15 +43,15 @@ end
 
 class PseudoChat
   attr_accessor :id
+
   def initialize(id)
     @id = id
   end
 end
 
 class PseudoMessage
-  attr_accessor :from
-  attr_accessor :chat
-  attr_accessor :text
+  attr_accessor :from, :chat, :text
+
   def initialize(from, chat, text)
     @from = from
     @chat = chat

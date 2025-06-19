@@ -9,7 +9,7 @@
 #
 #------------------------------------------------------------------------------
 
-require "test_helper"
+require 'test_helper'
 
 require 'minitest/autorun'
 require 'minitest/spec'
@@ -71,10 +71,10 @@ describe User do
   let(:db) { FakeDB.new }
   let(:user_id) { 10 }
   let(:privilege_level) { :regular }
-  let(:username) { "Nobody" }
+  let(:username) { 'Nobody' }
 
-  describe "user creation" do
-    it "persists new user with correct attributes" do
+  describe 'user creation' do
+    it 'persists new user with correct attributes' do
       # Exercise
       user = User.new(db, user_id, privilege_level, username)
 
@@ -94,27 +94,27 @@ describe User do
     end
   end
 
-  describe "loading existing user" do
+  describe 'loading existing user' do
     before do
-      db.users.add_user(user_id, UserStates.to_i(:privileged), "Bob")
+      db.users.add_user(user_id, UserStates.to_i(:privileged), 'Bob')
       @existing_record = db.users.get_user_by_id(user_id)
     end
 
-    it "loads user data without creating new record" do
+    it 'loads user data without creating new record' do
       # Exercise
       user = User.new(db, user_id)
 
       # Verify
-      assert_equal 1, db.users.all_users.size, "Should not add new record"
+      assert_equal 1, db.users.all_users.size, 'Should not add new record'
       assert_equal @existing_record.id, user.id
-      assert_equal "Bob", user.username
+      assert_equal 'Bob', user.username
       assert_equal :privileged, user.level
       assert user.privileged?
     end
   end
 
-  describe "nonexistent users" do
-    it "marks unknown users as nonexistent" do
+  describe 'nonexistent users' do
+    it 'marks unknown users as nonexistent' do
       # Exercise
       user = User.new(db, 999)
 
@@ -126,15 +126,15 @@ describe User do
     end
   end
 
-  describe "state predicates" do
-    it "correctly identifies all user states" do
+  describe 'state predicates' do
+    it 'correctly identifies all user states' do
       # Privileged user
-      privileged = User.new(db, 1, :privileged, "Admin")
+      privileged = User.new(db, 1, :privileged, 'Admin')
       assert privileged.privileged?
       refute privileged.regular?
 
       # Regular user
-      regular = User.new(db, 2, :regular, "Regular")
+      regular = User.new(db, 2, :regular, 'Regular')
       assert regular.regular?
       refute regular.privileged?
       refute regular.nonexistent?

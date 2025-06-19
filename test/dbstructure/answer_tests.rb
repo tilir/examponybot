@@ -14,20 +14,20 @@ require 'minitest/spec'
 require 'minitest/mock'
 require 'dbstructure'
 
-describe "UserQuestion and Answer Integration" do
+describe 'UserQuestion and Answer Integration' do
   let(:db)          { Minitest::Mock.new }
   let(:exam_id)     { 1 }
   let(:user_id)     { 2 }
   let(:question_id) { 3 }
   let(:uq_id)       { 42 }
   let(:answer_id)   { 99 }
-  let(:sample_text) { "Sample answer text" }
+  let(:sample_text) { 'Sample answer text' }
 
   describe UserQuestion do
-    it "correctly registers user-question assignment" do
+    it 'correctly registers user-question assignment' do
       # Setup mock expectations
       db.expect(:user_questions, db)
-      db.expect(:register, 
+      db.expect(:register,
                 DBUserQuestion.new(uq_id, exam_id, user_id, question_id),
                 [exam_id, user_id, question_id])
 
@@ -42,7 +42,7 @@ describe "UserQuestion and Answer Integration" do
       db.verify
     end
 
-    it "returns nil when no answer exists" do
+    it 'returns nil when no answer exists' do
       # Setup
       db.expect(:user_questions, db)
       db.expect(:register, mock_user_question, [exam_id, user_id, question_id])
@@ -55,16 +55,16 @@ describe "UserQuestion and Answer Integration" do
       db.verify
     end
 
-    it "returns Answer instance when answer exists" do
+    it 'returns Answer instance when answer exists' do
       # Setup
       db.expect(:user_questions, db)
       db.expect(:register, mock_user_question, [exam_id, user_id, question_id])
       db.expect(:answers, db)
-      db.expect(:find_by_user_question, 
-                DBAnswer.new(answer_id, uq_id, sample_text), 
+      db.expect(:find_by_user_question,
+                DBAnswer.new(answer_id, uq_id, sample_text),
                 [uq_id])
       db.expect(:answers, db)
-      db.expect(:create_or_update, 
+      db.expect(:create_or_update,
                 DBAnswer.new(answer_id, uq_id, sample_text),
                 [uq_id, sample_text])
 
@@ -82,10 +82,10 @@ describe "UserQuestion and Answer Integration" do
   end
 
   describe Answer do
-    it "creates new answer successfully" do
+    it 'creates new answer successfully' do
       # Setup
       db.expect(:answers, db)
-      db.expect(:create_or_update, 
+      db.expect(:create_or_update,
                 DBAnswer.new(answer_id, uq_id, sample_text),
                 [uq_id, sample_text])
 
@@ -99,7 +99,7 @@ describe "UserQuestion and Answer Integration" do
       db.verify
     end
 
-    it "loads existing answer from database" do
+    it 'loads existing answer from database' do
       # Setup
       db.expect(:answers, db)
       db.expect(:find_by_user_question,
@@ -121,17 +121,17 @@ describe "UserQuestion and Answer Integration" do
       db.expect(:find_by_user_question, nil, [uq_id])
 
       # Exercise/Verify
-      assert_raises(StandardError, "Answer not found") do
+      assert_raises(StandardError, 'Answer not found') do
         Answer.new(db, uq_id)
       end
       db.verify
     end
 
-    it "retrieves all reviews for the answer" do
+    it 'retrieves all reviews for the answer' do
       # Setup
       mock_reviews = [
-        DBReview.new(1, 1, 5, "Excellent"),
-        DBReview.new(2, 1, 3, "Average")
+        DBReview.new(1, 1, 5, 'Excellent'),
+        DBReview.new(2, 1, 3, 'Average')
       ]
       db.expect(:answers, db)
       db.expect(:find_by_user_question,
@@ -146,7 +146,7 @@ describe "UserQuestion and Answer Integration" do
 
       # Verify
       assert_equal 2, reviews.size
-      assert_equal "Excellent", reviews.first.review
+      assert_equal 'Excellent', reviews.first.review
       db.verify
     end
   end

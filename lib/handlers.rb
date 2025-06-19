@@ -39,7 +39,7 @@ class Handler
         handle_unknown_command(meth)
         false
       end
-    rescue => e
+    rescue StandardError => e
       handle_error(e)
       false
     end
@@ -103,18 +103,18 @@ class Handler
     end
 
     def log_registration(userid, name, type)
-      @api.send_message(chat_id: @tguser.id, 
-                       text: "User #{userid} registered as #{type}: #{name}")
+      @api.send_message(chat_id: @tguser.id,
+                        text: "User #{userid} registered as #{type}: #{name}")
     end
 
     def log_name_change(userid, old_name, new_name)
       @api.send_message(chat_id: @tguser.id,
-                       text: "User #{userid} name changed from #{old_name} to #{new_name}")
+                        text: "User #{userid} name changed from #{old_name} to #{new_name}")
     end
 
     def log_already_registered(userid, name)
       @api.send_message(chat_id: @tguser.id,
-                       text: "User #{userid} already registered as #{name}")
+                        text: "User #{userid} already registered as #{name}")
     end
 
     def assign_questions_if_needed(user)
@@ -170,17 +170,20 @@ class Handler
 
     def handle_error(error)
       error_location = error.backtrace_locations&.first
-      file, line = error_location.path, error_location.lineno if error_location
+      if error_location
+        file = error_location.path
+        line = error_location.lineno
+      end
 
       error_message = <<~ERROR_MSG
         +++ CRASH REPORT +++
         Time: #{Time.now}
         Error: #{error.class} - #{error.message}
         Location: #{file}:#{line}
-        
+
         FULL BACKTRACE:
         #{error.backtrace&.join("\n")}
-        
+
         CONTEXT:
         User: #{@tguser.inspect}
         Method: #{__method__}
@@ -230,7 +233,7 @@ class Handler
       (grade.to_f / allrevs.length).round
     end
 
-    private def send_reviewing_task(api, tguser, dbuser, reviewer)
+    private def send_reviewing_task(api, _tguser, dbuser, reviewer)
       student = User.from_db_user(@dbl, dbuser)
       answs = student.all_answers
       Logger.print "got #{answs.length} answers to review from #{student.userid}"
@@ -288,7 +291,7 @@ class Handler
       @api.send_message(chat_id: @tguser.id, text: "Warning: #{nn} * #{nv} != #{allq.length}")
     end
 
-    def addexam(rest = '')
+    def addexam(_rest = '')
       if @dbl.exams.empty?
         Exam.new(@dbl, 'exam')
         @api.send_message(chat_id: @tguser.id, text: 'Exam added')
@@ -297,7 +300,7 @@ class Handler
       end
     end
 
-    def startexam(rest = '')
+    def startexam(_rest = '')
       exam = Exam.new(@dbl, 'exam')
       if exam.state != :stopped
         @api.send_message(chat_id: @tguser.id, text: 'Exam currently not in stopped mode')
@@ -308,13 +311,13 @@ class Handler
       @dbl.users.all_nonpriv.each { |dbuser| assign_questions(dbuser, exam) }
     end
 
-    def stopexam(rest = '')
+    def stopexam(_rest = '')
       if @dbl.exams.empty?
         @api.send_message(chat_id: @tguser.id, text: 'No exam to stop')
         return
       end
       exam = Exam.new(@dbl, 'exam')
-      if (exam.state == :stopped)
+      if exam.state == :stopped
         @api.send_message(chat_id: @tguser.id, text: 'Exam already stopped')
         return
       end
@@ -322,7 +325,7 @@ class Handler
       @api.send_message(chat_id: @tguser.id, text: 'Exam stopped')
     end
 
-    def startreview(rest = '')
+    def startreview(_rest = '')
       exam = Exam.new(@dbl, 'exam')
       if exam.state != :answering
         @api.send_message(chat_id: @tguser.id, text: 'Exam currently not in answering mode')
@@ -350,7 +353,7 @@ class Handler
       end
     end
 
-    def setgrades(rest = '')
+    def setgrades(_rest = '')
       exam = Exam.new(@dbl, 'exam')
       if exam.state != :reviewing
         @api.send_message(chat_id: @tguser.id, text: 'Exam currently not in reviewing mode')
@@ -456,9 +459,10 @@ class Handler
         @api.send_message(chat_id: @tguser.id, text: "You don't have this question yet.")
         return
       end
-      
+
       answ = @dbl.answers.create_or_update(uqst.id, t)
-      raise "uqid changed in process" unless answ.user_question_id == uqst.id
+      raise 'uqid changed in process' unless answ.user_question_id == uqst.id
+
       @api.send_message(chat_id: @tguser.id, text: "Answer recorded to #{uqst.id}")
     end
 
@@ -591,10 +595,10 @@ class Handler
   def process_message(api, message)
     Logger.print "process_message: #{message.text}"
 
-    Logger.print "nil message" if message.text.nil?
+    Logger.print 'nil message' if message.text.nil?
     return false if message.text.nil?
 
-    Logger.print "incorrect message" unless message.text.start_with?('/')
+    Logger.print 'incorrect message' unless message.text.start_with?('/')
     return false unless message.text.start_with?('/')
 
     re = /(\w+)\s*(.*)/m

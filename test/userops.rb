@@ -28,7 +28,7 @@ describe 'User Operations' do
     it 'adds new user and can retrieve it' do
       user = User.new(@db, 100, UserStates.to_i(:regular), 'User100')
       refute_nil user.id
-      
+
       found = @db.users.get_user_by_id(100)
       assert_equal 100, found.userid
       assert_equal 'User100', found.username
@@ -38,7 +38,7 @@ describe 'User Operations' do
     it 'updates username and privilege level when user exists' do
       user1 = User.new(@db, 101, UserStates.to_i(:regular), 'User101')
       user2 = User.new(@db, 101, UserStates.to_i(:privileged), 'User101Updated')
-      
+
       assert_equal user1.id, user2.id
       assert_equal 'User101Updated', user2.username
       refute user2.regular?
@@ -47,7 +47,7 @@ describe 'User Operations' do
     it 'handles long usernames' do
       long_name = 'u' * 500
       user = User.new(@db, 350, UserStates.to_i(:regular), long_name)
-      
+
       found = @db.users.get_user_by_id(350)
       assert_equal long_name, found.username
       assert_equal long_name, user.username
@@ -56,7 +56,7 @@ describe 'User Operations' do
     it 'handles special characters in username' do
       special_name = 'user!@# $%^&*()'
       user = User.new(@db, 360, UserStates.to_i(:regular), special_name)
-      
+
       found = @db.users.get_user_by_id(360)
       assert_equal special_name, found.username
       assert_equal special_name, user.username

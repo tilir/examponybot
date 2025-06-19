@@ -13,7 +13,7 @@ class DBLayerError < StandardError
 end
 
 module Schema
-  def create_schema(db)    
+  def create_schema(db)
     db.execute_batch <<-SQL
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY,
@@ -184,7 +184,7 @@ def log_database_contents(db)
     columns = db.execute("PRAGMA table_info(#{table})").map { |col| col[1] }
 
     if rows.empty?
-      puts "(empty)"
+      puts '(empty)'
     else
       rows.each_with_index do |row, idx|
         row_hash = columns.zip(row).to_h

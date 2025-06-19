@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
+
 #------------------------------------------------------------------------------
 #
 # Exam maker for ponybot
@@ -20,19 +21,19 @@ require_relative 'lib/pseudoapi'
 
 options = {}
 OptionParser.new do |opts|
-  opts.banner = "Usage: ./ponymaker.rb -f questions.txt -o exam.db"
+  opts.banner = 'Usage: ./ponymaker.rb -f questions.txt -o exam.db'
 
-  opts.on("-fFILE", "--file=FILE", "Input question file") do |f|
+  opts.on('-fFILE', '--file=FILE', 'Input question file') do |f|
     options[:file] = f
   end
 
-  opts.on("-oDB", "--output=DB", "Output database file") do |db|
+  opts.on('-oDB', '--output=DB', 'Output database file') do |db|
     options[:db] = db
   end
 end.parse!
 
 unless options[:file] && options[:db]
-  warn "Please specify input file (-f) and data base (-o)"
+  warn 'Please specify input file (-f) and data base (-o)'
   exit 1
 end
 
@@ -41,7 +42,7 @@ api = PseudoApi.new
 prepod = PseudoTGUser.new(167_346_988, 'Tilir')
 chat = PseudoChat.new(1)
 
-register_event = PseudoMessage.new(prepod, chat, "/register")
+register_event = PseudoMessage.new(prepod, chat, '/register')
 handler.process_message(api, register_event)
 
 importer = QuestionImporter.new(

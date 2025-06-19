@@ -13,7 +13,7 @@ test_files = [
   'test/dbstructure/question_tests.rb',
   'test/dbstructure/review_tests.rb',
   'test/dbstructure/user_tests.rb',
-  'test/handlers/command_tests.rb',
+  'test/handlers/command_tests.rb'
 ]
 
 Rake::TestTask.new(:test) do |t|
@@ -23,9 +23,9 @@ end
 
 # to run like:
 # > bundle exec rake group['Smoke']
-task :group, [:group_name] do |t, args|
+task :group, [:group_name] do |_t, args|
   require 'find'
-  
+
   group_name = args[:group_name]
   unless group_name
     puts "Usage: rake test:by_group['Group Name']"
@@ -37,10 +37,10 @@ task :group, [:group_name] do |t, args|
   test_files = []
   Find.find('test') do |path|
     next unless path.end_with?('.rb') && File.file?(path)
-    
+
     content = File.read(path)
     if content.include?(group_name)
-      test_files << path 
+      test_files << path
       puts "Found in: #{path}"
     end
   end
@@ -73,6 +73,6 @@ RuboCop::RakeTask.new(:lint_fix_aggressive) do |task|
   task.fail_on_error = false
 end
 
-task :ci => [:lint, :test]
+task ci: %i[lint test]
 
 task default: :test

@@ -17,7 +17,7 @@ require 'importer'
 # Configure once at the beginning (disable for clean test output)
 Logger.set_verbose(false)
 
-describe "Privileged User Registration" do
+describe 'Privileged User Registration' do
   before do
     setup_test_env
   end
@@ -26,26 +26,26 @@ describe "Privileged User Registration" do
     cleanup_test_env
   end
 
-  it "successfully registers admin user" do
+  it 'successfully registers admin user' do
     # Check initial empty state
-    assert @dbl.users.empty?, "User table should be empty initially"
-    
+    assert @dbl.users.empty?, 'User table should be empty initially'
+
     # Simulate registration command
     register_msg = PseudoMessage.new(@prepod, @chat, '/register')
     @handler.process_message(@api, register_msg)
 
     # Verify bot response
-    assert_includes @api.text!, "registered as privileged"
+    assert_includes @api.text!, 'registered as privileged'
 
     # Verify database state
-    refute @dbl.users.empty?, "User should be added to database"
+    refute @dbl.users.empty?, 'User should be added to database'
     dbuser = @dbl.users.get_user_by_id(@prepod.id)
     assert dbuser
-    assert_equal :privileged, UserStates.to_sym(dbuser.privlevel), "User should have privileged status"
+    assert_equal :privileged, UserStates.to_sym(dbuser.privlevel), 'User should have privileged status'
   end
 end
 
-describe "Smoke" do
+describe 'Smoke' do
   before do
     setup_test_env
     register_privuser
@@ -55,24 +55,24 @@ describe "Smoke" do
     cleanup_test_env
   end
 
-  it "passes workflow successfully" do
+  it 'passes workflow successfully' do
     # initially reset state
     @api.text!
 
     # Try to stop before exists
     event = PseudoMessage.new(@prepod, @chat, '/stopexam')
     @handler.process_message(@api, event)
-    assert_includes @api.text!, "No exam to stop"
+    assert_includes @api.text!, 'No exam to stop'
 
     # Test exam creation
     exam_msg = PseudoMessage.new(@prepod, @chat, '/addexam exam')
     @handler.process_message(@api, exam_msg)
-    
-    assert_includes @api.text!, "Exam added"
-    refute @dbl.exams.empty?, "Exam should be created in database"
+
+    assert_includes @api.text!, 'Exam added'
+    refute @dbl.exams.empty?, 'Exam should be created in database'
 
     # import exam
-    exam_path = File.expand_path("example_exam.txt", __dir__)
+    exam_path = File.expand_path('example_exam.txt', __dir__)
     importer = QuestionImporter.new(
       filename: exam_path,
       handler: @handler,
@@ -83,26 +83,26 @@ describe "Smoke" do
     importer.import!
 
     # Verify imported questions
-    assert_equal 3, @dbl.questions.n_questions, "Should import all 3 questions"
-    assert_equal 3, @dbl.questions.n_variants, "Should support 3 variants"
+    assert_equal 3, @dbl.questions.n_questions, 'Should import all 3 questions'
+    assert_equal 3, @dbl.questions.n_variants, 'Should support 3 variants'
 
     # Try stop exam which is already stopped
     event = PseudoMessage.new(@prepod, @chat, '/stopexam')
     @handler.process_message(@api, event)
-    assert_includes @api.text!, "Exam already stopped"
+    assert_includes @api.text!, 'Exam already stopped'
 
     # Try to get question list as a student -- not available for students
     message = PseudoMessage.new(@student1, @chat, '/questions')
     @handler.process_message(@api, message)
-    assert_includes @api.text!, "Unknown command"
+    assert_includes @api.text!, 'Unknown command'
 
     # Query questions
     event = PseudoMessage.new(@prepod, @chat, '/questions')
     @handler.process_message(@api, event)
     response = @api.text!
     expected_fragments = [
-      "all questions",
-      *["1", "2", "3"].product(["1", "2", "3"]).map { |a,b| "#{a} #{b}" }
+      'all questions',
+      *%w[1 2 3].product(%w[1 2 3]).map { |a, b| "#{a} #{b}" }
     ]
 
     expected_fragments.each do |fragment|
@@ -112,17 +112,17 @@ describe "Smoke" do
     # register regular student
     event = PseudoMessage.new(@student1, @chat, '/register')
     @handler.process_message(@api, event)
-    assert_includes @api.text!, "registered as regular: student1"
+    assert_includes @api.text!, 'registered as regular: student1'
 
     # register one more time
     event = PseudoMessage.new(@student1, @chat, '/register')
     @handler.process_message(@api, event)
-    assert_includes @api.text!, "already registered as student1"
+    assert_includes @api.text!, 'already registered as student1'
 
     # register one more
     event = PseudoMessage.new(@student2, @chat, '/register')
     @handler.process_message(@api, event)
-    assert_includes @api.text!, "registered as regular: student2"
+    assert_includes @api.text!, 'registered as regular: student2'
 
     assert_equal 2, @dbl.users.all_nonpriv.size
     assert_equal 3, @dbl.users.all.size
@@ -131,7 +131,7 @@ describe "Smoke" do
     event = PseudoMessage.new(@prepod, @chat, '/users')
     @handler.process_message(@api, event)
     response = @api.text!
-    ["student1", "student2"].each do |fragment|
+    %w[student1 student2].each do |fragment|
       assert_includes response, fragment
     end
 
@@ -144,9 +144,9 @@ describe "Smoke" do
     event = PseudoMessage.new(@prepod, @chat, '/startexam')
     @handler.process_message(@api, event)
     response = @api.text!
-    assert_includes response, "Exam started, sending questions"
+    assert_includes response, 'Exam started, sending questions'
     expected_fragments = [
-      *[@student1.id.to_s, @student2.id.to_s].product(["1", "2", "3"]).map { |a,b| "#{a} : Question #{b}" }
+      *[@student1.id.to_s, @student2.id.to_s].product(%w[1 2 3]).map { |a, b| "#{a} : Question #{b}" }
     ]
 
     expected_fragments.each do |fragment|
@@ -172,9 +172,9 @@ describe "Smoke" do
     event = PseudoMessage.new(@student3, @chat, '/register')
     @handler.process_message(@api, event)
     response = @api.text!
-    assert_includes response, "registered as regula"
+    assert_includes response, 'registered as regula'
     expected_fragments = [
-      *[@student3.id.to_s].product(["1", "2", "3"]).map { |a,b| "#{a} : Question #{b}" }
+      *[@student3.id.to_s].product(%w[1 2 3]).map { |a, b| "#{a} : Question #{b}" }
     ]
 
     expected_fragments.each do |fragment|
@@ -188,7 +188,7 @@ describe "Smoke" do
     event = PseudoMessage.new(@prepod, @chat, '/users')
     @handler.process_message(@api, event)
     response = @api.text!
-    ["student1", "student2", "student3"].each do |fragment|
+    %w[student1 student2 student3].each do |fragment|
       assert_includes response, fragment
     end
 
@@ -315,11 +315,10 @@ describe "Smoke" do
     event = PseudoMessage.new(@prepod, @chat, '/startreview')
     @handler.process_message(@api, event)
     response = @api.text!
-    assert_includes response, "Review assignment: 1"
-    assert_includes response, "Review assignment: 18"
-    refute_includes response, "Review assignment: 19"
+    assert_includes response, 'Review assignment: 1'
+    assert_includes response, 'Review assignment: 18'
+    refute_includes response, 'Review assignment: 19'
 
-=begin
     event = PseudoMessage.new(@student1, @chat, "/review 10 2 don't like it")
     @handler.process_message(@api, event)
     p @api.text!
@@ -411,7 +410,6 @@ describe "Smoke" do
     event = PseudoMessage.new(@student3, @chat, '/review 6 10 like it')
     @handler.process_message(@api, event)
     p @api.text!
-=end
 
     # time to set grades
     event = PseudoMessage.new(@prepod, @chat, '/setgrades')
@@ -422,6 +420,6 @@ describe "Smoke" do
     event = PseudoMessage.new(@prepod, @chat, '/stopexam')
     @handler.process_message(@api, event)
     response = @api.text!
-    assert_includes response, "Exam stopped"
+    assert_includes response, 'Exam stopped'
   end
 end

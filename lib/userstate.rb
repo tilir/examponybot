@@ -11,9 +11,9 @@
 
 module UserStates
   STATES = {
-    privileged:   0,
-    regular:      1,
-    nonexistent:  2
+    privileged: 0,
+    regular: 1,
+    nonexistent: 2
   }.freeze
 
   NAMES = STATES.invert.freeze
@@ -30,4 +30,3 @@ module UserStates
     STATES.key?(val) || NAMES.key?(val)
   end
 end
-

@@ -19,13 +19,13 @@ describe Question do
   let(:question_id) { 42 }
   let(:question_number) { 1 }
   let(:variant_number) { 2 }
-  let(:question_text) { "What is Ruby?" }
+  let(:question_text) { 'What is Ruby?' }
 
-  describe "creating new question" do
-    it "persists question and initializes object" do
+  describe 'creating new question' do
+    it 'persists question and initializes object' do
       # Setup mock expectations
       db.expect(:questions, db)
-      db.expect(:add_question, 
+      db.expect(:add_question,
                 DBQuestion.new(question_id, question_number, variant_number, question_text),
                 [question_number, variant_number, question_text])
 
@@ -41,8 +41,8 @@ describe Question do
     end
   end
 
-  describe "loading existing question" do
-    it "retrieves question from database" do
+  describe 'loading existing question' do
+    it 'retrieves question from database' do
       # Setup
       db.expect(:questions, db)
       db.expect(:get_question,
