@@ -42,6 +42,23 @@ Prepare exams offline using the ponymaker script. Example exam format is in the 
 - /stopexam - end exam (enables new registrations)
 - /exit - shutdown bot gracefully
 
+### For developers
+
+How to install gems and run tests
+
+```bash
+git clone https://github.com/tilir/examponybot.git
+cd examponybot
+bundle install
+bundle exec rake test TESTOPTS="-v"
+```
+
+Alternative: running test group
+
+```bash
+bundle exec rake group[Smoke]
+```
+
 ## Contributing
 We welcome pull requests!
 
