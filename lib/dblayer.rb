@@ -406,6 +406,29 @@ class AnswerManager
     @db.execute(query).map { |row| DBUser.from_db_row(row) }
   end
 
+  def user_answer_stats
+    query = <<~SQL
+      SELECT 
+        u.userid, u.username,
+        COUNT(a.id) AS total_answers,
+        GROUP_CONCAT(DISTINCT uq.question) AS answered_questions
+      FROM users u
+      INNER JOIN userquestions uq ON u.id = uq.user
+      INNER JOIN answers a ON uq.id = a.uqid
+      WHERE u.privlevel = 1
+      GROUP BY u.id
+    SQL
+
+    @db.execute(query).map do |row|
+      {
+        telegram_id: row[0],
+        username: row[1],
+        total_answers: row[2],
+        answered_questions: row[3]&.split(',')&.map(&:to_i) || []
+      }
+    end
+  end
+
   alias create_or_update record_answer
   alias find_by_user_question uqid_to_answer
   alias find_by_answer awid_to_userquestion
@@ -430,11 +453,11 @@ class ReviewManager
 
   def tguser_reviews(tgid)
     query = <<-SQL
-      SELECT reviews.id, reviews.grade, reviews.review
+      SELECT reviews.id, reviews.revid, reviews.grade, reviews.review
       FROM reviews
-      JOIN userreviews ON reviews.revid = userreviews.id
-      JOIN users ON userreviews.reviewer = users.id
-      WHERE users.userid = ?;
+      INNER JOIN userreviews ON reviews.revid = userreviews.id
+      INNER JOIN users ON userreviews.reviewer = users.id
+      WHERE users.userid = ?
     SQL
     @db.execute(query, tgid).map { |row| DBReview.from_db_row(row) }
   end
@@ -499,6 +522,30 @@ class ReviewManager
       WHERE userreviews.uqid = ?
     SQL
     @db.execute(query, uqid).map { |row| DBReview.from_db_row(row) }
+  end
+
+  def user_review_stats
+    query = <<~SQL
+      SELECT 
+        u.userid,
+        u.username,
+        COUNT(r.id) AS total_reviews,
+        GROUP_CONCAT(DISTINCT ur.uqid) AS reviewed_answers
+      FROM users u
+      INNER JOIN userreviews ur ON u.id = ur.reviewer
+      INNER JOIN reviews r ON ur.id = r.revid
+      WHERE u.privlevel = 1
+      GROUP BY u.id
+    SQL
+
+    @db.execute(query).map do |row|
+      {
+        telegram_id: row[0],
+        username: row[1],
+        total_reviews: row[2],
+        reviewed_answers: row[3]&.split(',')&.map(&:to_i) || []
+      }
+    end
   end
 
   # @param telegram_user_id [Integer] Telegram user ID (users.userid)

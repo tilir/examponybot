@@ -55,6 +55,11 @@ describe Handler::Command do
     end
     Handler::Command.new(mock_api, tguser, dbl).register('First')
 
+    mock_api.expect(:send_message, nil) do |h|
+      h[:chat_id] == tguser.id && h[:text].include?('added')
+    end
+    Handler::PrivilegedCommand.new(mock_api, tguser, dbl).addexam()
+
     tguser2 = OpenStruct.new(id: 456, username: 'second')
 
     mock_api.expect(:send_message, nil) do |h|

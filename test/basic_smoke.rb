@@ -375,6 +375,18 @@ describe 'Smoke' do
 
     assert_equal 3, allanswered.size
 
+    # prepod looks up all answers from student1
+    event = PseudoMessage.new(@prepod, @chat, "/answersof #{user1.userid}")
+    @handler.process_message(@api, event)
+    response = @api.text!
+    assert_includes response, "Answer:"
+
+    # aggregated answer statistics
+    event = PseudoMessage.new(@prepod, @chat, "/answerstat")
+    @handler.process_message(@api, event)
+    response = @api.text!
+    assert_includes response, "Answers submitted:"
+
     # create review assignments
     # we have 4 students, 2 have 3 answers each, 1 have 2 answers, 1 have 0 answers.
     # 2 reviewers per answer yield 16 review assignments
@@ -517,11 +529,27 @@ describe 'Smoke' do
       assert_includes response, "#{@student3.id} : You sent #{ncorr} out of #{s3assignments.size} required reviews"
     end
 
+    # uberrazdolb tries to register
+    event = PseudoMessage.new(@student5, @chat, "/register")
+    @handler.process_message(@api, event)
+    response = @api.text!
+    assert_includes response, 'Exam not accepting registers now'
+
+    # prepod looks up all reviews from student1
+    event = PseudoMessage.new(@prepod, @chat, "/reviewsof #{user1.userid}")
+    @handler.process_message(@api, event)
+    response = @api.text!
+    assert_includes response, 'Review:'
+
+    event = PseudoMessage.new(@prepod, @chat, "/reviewstat")
+    @handler.process_message(@api, event)
+    response = @api.text!
+    assert_includes response, "Reviews submitted:"
+
     # time to set grades
     event = PseudoMessage.new(@prepod, @chat, '/setgrades')
     @handler.process_message(@api, event)
     response = @api.text!
-
     assert_includes response, "#{@student1.id} : Reviews for your question"
     assert_includes response, "#{@student2.id} : Reviews for your question"
     assert_includes response, "#{@student3.id} : You haven't done your reviewing due"
