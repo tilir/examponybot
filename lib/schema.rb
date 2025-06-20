@@ -333,20 +333,23 @@ def log_database_contents(db)
     reviews
   ]
 
+  result = String.new
+
   tables.each do |table|
-    puts "--- Table: #{table} ---"
+    result << "--- Table: #{table} ---\n"
     rows = db.execute("SELECT * FROM #{table}")
     columns = db.execute("PRAGMA table_info(#{table})").map { |col| col[1] }
 
     if rows.empty?
-      puts '(empty)'
+      result << '(empty)\n'
     else
       rows.each_with_index do |row, idx|
         row_hash = columns.zip(row).to_h
-        puts "#{idx + 1}. #{row_hash.inspect}"
+        result << "#{idx + 1}. #{row_hash.inspect}\n"
       end
     end
 
-    puts
+    result << "---\n"
   end
+  result
 end

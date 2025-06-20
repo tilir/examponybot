@@ -11,6 +11,7 @@
 #
 #------------------------------------------------------------------------------
 
+require 'tempfile'
 require_relative 'dblayer'
 
 N_REVIEWERS = 2
@@ -64,13 +65,14 @@ class Handler
       # TODO: rework this to accept multiple exams
       exam = Exam.new(@dbl, 'exam')
 
-      if exam.state == :reviewing || exam.state == :grading
+      if %i[reviewing grading].include?(exam.state)
         @api.send_message(chat_id: @tguser.id, text: 'Exam not accepting registers now: it is reviewing or grading')
         return
       end
 
       user = register_user(@tguser.id, name)
       return if exam.state == :stopped
+
       assign_questions(user, exam)
     end
 
@@ -363,6 +365,7 @@ class Handler
 
     def answerstat(_rest = '')
       stat = @dbl.answers.user_answer_stats
+
       apitext = stat.map do |student|
         <<~REPORT
           Student: @#{student[:username]} (#{student[:telegram_id]})
@@ -372,14 +375,14 @@ class Handler
         REPORT
       end.join("\n")
 
-      @api.send_message(chat_id: @tguser.id, text: apitext)
+      @api.send_message(chat_id: @tguser.id, text: "ANSWERS:\n#{apitext}")
     end
 
     def answersof(rest = '')
       re = /(.+)/m
       tgid = rest.match(re).to_s
       unless tgid
-        @api.send_message(chat_id: @tguser.id, text: "Wrong command format: specify tgid") 
+        @api.send_message(chat_id: @tguser.id, text: 'Wrong command format: specify tgid')
         return
       end
       dbuser = @dbl.users.get_user_by_id(tgid)
@@ -399,7 +402,7 @@ class Handler
         REPORT
       end.join("\n")
 
-      @api.send_message(chat_id: @tguser.id, text: apitext)
+      @api.send_message(chat_id: @tguser.id, text: "ANSWERS:\n#{apitext}")
     end
 
     def reviewstat(_rest = '')
@@ -413,14 +416,14 @@ class Handler
         REPORT
       end.join("\n")
 
-      @api.send_message(chat_id: @tguser.id, text: apitext)
+      @api.send_message(chat_id: @tguser.id, text: "REVIEWS:\n#{apitext}")
     end
 
     def reviewsof(rest = '')
       re = /(.+)/m
       tgid = rest.match(re).to_s
       unless tgid
-        @api.send_message(chat_id: @tguser.id, text: "Wrong command format: specify tgid") 
+        @api.send_message(chat_id: @tguser.id, text: 'Wrong command format: specify tgid')
         return
       end
       dbuser = @dbl.users.get_user_by_id(tgid)
@@ -433,6 +436,7 @@ class Handler
         dbansw = @dbl.answers.uqid_to_answer(uqid)
         dbqst = @dbl.answers.uqid_to_question(uqid)
         next if dbansw.nil? || dbqst.nil?
+
         <<~REPORT
           Review:
           ---
@@ -445,13 +449,19 @@ class Handler
         REPORT
       end.join("\n")
 
-      @api.send_message(chat_id: @tguser.id, text: apitext)
+      @api.send_message(chat_id: @tguser.id, text: "REVIEWS:\n#{apitext}")
     end
 
-
     def dumpdb(_rest = '')
-      apitext = @dbl.dumpdb
-      @api.send_message(chat_id: @tguser.id, text: apitext)
+      Tempfile.create('db_dump.txt') do |f|
+        f.write(@dbl.dumpdb)
+        f.rewind
+        @api.send_document(
+          chat_id: @tguser.id,
+          document: Faraday::UploadIO.new(f.path, 'text/plain'),
+          caption: "DB Dump #{Time.now}"
+        )
+      end
     end
 
     def reload
@@ -622,7 +632,7 @@ class Handler
       n = m[1].to_i
 
       unless n
-        @api.send_message(chat_id: @tguser.id, text: "Wrong command format: specify n") 
+        @api.send_message(chat_id: @tguser.id, text: 'Wrong command format: specify n')
         return
       end
 
@@ -778,7 +788,6 @@ class Handler
     tguser = message.from
     tgchat = message.chat
     Logger.print "C: /#{command} from <#{tguser.id}> in chat <#{tgchat.id}> with rest <#{rest}>"
-
     cmnd = get_command(api, tguser)
     rest.empty? ? cmnd.try_call(command) : cmnd.try_call(command, rest)
   end
@@ -790,10 +799,19 @@ class Handler
   private
 
   def get_command(api, tguser)
-    dbuser = User.new(@dbl, tguser.id)
-    return Command.new(api, tguser, @dbl) if dbuser.level == :nonexistent
-    return PrivilegedCommand.new(api, tguser, @dbl) if dbuser.level == :privileged
+    dbuser = @dbl.users.get_user_by_id(tguser.id)
 
-    NonPrivilegedCommand.new(api, tguser, @dbl)
+    # case when no user present
+    return Command.new(api, tguser, @dbl) unless dbuser
+
+    # regular case
+    case UserStates.to_sym(dbuser.privlevel)
+    when :nonexistent
+      Command.new(api, tguser, @dbl)
+    when :privileged
+      PrivilegedCommand.new(api, tguser, @dbl)
+    else
+      NonPrivilegedCommand.new(api, tguser, @dbl)
+    end
   end
 end

@@ -62,6 +62,11 @@ describe 'Smoke' do
     # initially reset state
     @api.text!
 
+    event = PseudoMessage.new(@prepod, @chat, '/answerstat')
+    @handler.process_message(@api, event)
+
+    assert_includes @api.text!, 'ANSWERS'
+
     # Try to stop before exists
     event = PseudoMessage.new(@prepod, @chat, '/stopexam')
     @handler.process_message(@api, event)
@@ -125,12 +130,14 @@ describe 'Smoke' do
     event = PseudoMessage.new(@prepod, @chat, '/help')
     @handler.process_message(@api, event)
     response = @api.text!
+
     assert_includes response, 'startexam'
 
     # Registered student issue help
     event = PseudoMessage.new(@student1, @chat, '/help')
     @handler.process_message(@api, event)
     response = @api.text!
+
     refute_includes response, 'startexam'
     assert_includes response, 'lookup_question'
 
@@ -138,6 +145,7 @@ describe 'Smoke' do
     event = PseudoMessage.new(@student2, @chat, '/help')
     @handler.process_message(@api, event)
     response = @api.text!
+
     refute_includes response, 'startexam'
     refute_includes response, 'lookup_question'
     assert_includes response, 'register'
@@ -379,13 +387,15 @@ describe 'Smoke' do
     event = PseudoMessage.new(@prepod, @chat, "/answersof #{user1.userid}")
     @handler.process_message(@api, event)
     response = @api.text!
-    assert_includes response, "Answer:"
+
+    assert_includes response, 'Answer:'
 
     # aggregated answer statistics
-    event = PseudoMessage.new(@prepod, @chat, "/answerstat")
+    event = PseudoMessage.new(@prepod, @chat, '/answerstat')
     @handler.process_message(@api, event)
     response = @api.text!
-    assert_includes response, "Answers submitted:"
+
+    assert_includes response, 'Answers submitted:'
 
     # create review assignments
     # we have 4 students, 2 have 3 answers each, 1 have 2 answers, 1 have 0 answers.
@@ -530,26 +540,30 @@ describe 'Smoke' do
     end
 
     # uberrazdolb tries to register
-    event = PseudoMessage.new(@student5, @chat, "/register")
+    event = PseudoMessage.new(@student5, @chat, '/register')
     @handler.process_message(@api, event)
     response = @api.text!
+
     assert_includes response, 'Exam not accepting registers now'
 
     # prepod looks up all reviews from student1
     event = PseudoMessage.new(@prepod, @chat, "/reviewsof #{user1.userid}")
     @handler.process_message(@api, event)
     response = @api.text!
+
     assert_includes response, 'Review:'
 
-    event = PseudoMessage.new(@prepod, @chat, "/reviewstat")
+    event = PseudoMessage.new(@prepod, @chat, '/reviewstat')
     @handler.process_message(@api, event)
     response = @api.text!
-    assert_includes response, "Reviews submitted:"
+
+    assert_includes response, 'Reviews submitted:'
 
     # time to set grades
     event = PseudoMessage.new(@prepod, @chat, '/setgrades')
     @handler.process_message(@api, event)
     response = @api.text!
+
     assert_includes response, "#{@student1.id} : Reviews for your question"
     assert_includes response, "#{@student2.id} : Reviews for your question"
     assert_includes response, "#{@student3.id} : You haven't done your reviewing due"

@@ -408,7 +408,7 @@ class AnswerManager
 
   def user_answer_stats
     query = <<~SQL
-      SELECT 
+      SELECT#{' '}
         u.userid, u.username,
         COUNT(a.id) AS total_answers,
         GROUP_CONCAT(DISTINCT uq.question) AS answered_questions
@@ -526,7 +526,7 @@ class ReviewManager
 
   def user_review_stats
     query = <<~SQL
-      SELECT 
+      SELECT#{' '}
         u.userid,
         u.username,
         COUNT(r.id) AS total_reviews,
