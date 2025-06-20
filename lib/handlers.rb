@@ -414,7 +414,7 @@ class Handler
       end
     end
 
-    def print_help
+    def help_text
       <<~HELP
         /addquestion n v text
         /questions
@@ -587,7 +587,7 @@ class Handler
       true
     end
 
-    def print_help
+    def help_text
       <<~HELP
         /register [name] -- change your name.
         /answer n text -- send answer to nth question in your exam ticket. Text can be multi-line.

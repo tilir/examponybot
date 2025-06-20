@@ -121,6 +121,27 @@ describe 'Smoke' do
 
     assert_includes @api.text!, 'registered as regular: student1'
 
+    # Prepod issue help
+    event = PseudoMessage.new(@prepod, @chat, '/help')
+    @handler.process_message(@api, event)
+    response = @api.text!
+    assert_includes response, 'startexam'
+
+    # Registered student issue help
+    event = PseudoMessage.new(@student1, @chat, '/help')
+    @handler.process_message(@api, event)
+    response = @api.text!
+    refute_includes response, 'startexam'
+    assert_includes response, 'lookup_question'
+
+    # Non-registered student issue help
+    event = PseudoMessage.new(@student2, @chat, '/help')
+    @handler.process_message(@api, event)
+    response = @api.text!
+    refute_includes response, 'startexam'
+    refute_includes response, 'lookup_question'
+    assert_includes response, 'register'
+
     # register one more time
     event = PseudoMessage.new(@student1, @chat, '/register')
     @handler.process_message(@api, event)
