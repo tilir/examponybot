@@ -462,6 +462,32 @@ class ReviewManager
     @db.execute(query, tgid).map { |row| DBReview.from_db_row(row) }
   end
 
+  def detailed_reviews_for_user(tgid)
+    query = <<~SQL
+      SELECT#{' '}
+        r.id, r.grade, r.review,
+        rev.userid AS reviewer_id,
+        q.number AS question_num
+      FROM reviews r
+      INNER JOIN userreviews ur ON r.revid = ur.id
+      INNER JOIN users rev ON ur.reviewer = rev.id
+      INNER JOIN userquestions uq ON ur.uqid = uq.id
+      INNER JOIN users target ON uq.user = target.id
+      INNER JOIN questions q ON uq.question = q.id
+      WHERE target.userid = ?
+    SQL
+
+    @db.execute(query, tgid).map do |row|
+      {
+        id: row[0],
+        grade: row[1],
+        text: row[2],
+        reviewer: row[3],
+        question: row[4]
+      }
+    end
+  end
+
   def create_review_assignment(rid, uqid)
     row = @db.get_first_row(
       'SELECT id FROM userreviews WHERE reviewer = ? AND uqid = ?',

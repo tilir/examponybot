@@ -388,7 +388,7 @@ describe 'Smoke' do
     @handler.process_message(@api, event)
     response = @api.text!
 
-    assert_includes response, 'Answer:'
+    assert_includes response, 'ANSWERS'
 
     # aggregated answer statistics
     event = PseudoMessage.new(@prepod, @chat, '/answerstat')
@@ -552,6 +552,12 @@ describe 'Smoke' do
     response = @api.text!
 
     assert_includes response, 'Review:'
+
+    event = PseudoMessage.new(@prepod, @chat, "/reviewsfor #{user1.userid}")
+    @handler.process_message(@api, event)
+    response = @api.text!
+
+    p response
 
     event = PseudoMessage.new(@prepod, @chat, '/reviewstat')
     @handler.process_message(@api, event)

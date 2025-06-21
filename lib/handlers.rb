@@ -256,10 +256,6 @@ class Handler
     end
 
     def startexam(_rest = '')
-      if @dbl.exams.empty?
-        @api.send_message(chat_id: @tguser.id, text: 'No exam to start')
-        return
-      end
       exam = Exam.new(@dbl, 'exam')
       if exam.state != :stopped
         @api.send_message(chat_id: @tguser.id, text: 'Exam currently not in stopped mode')
@@ -394,7 +390,7 @@ class Handler
       apitext = user.all_answers.map do |dbansw|
         dbqst = @dbl.answers.uqid_to_question(dbansw.uqid)
         <<~REPORT
-          Answer:
+          Question:
           ---
           #{dbqst.question}
           ---
@@ -402,7 +398,11 @@ class Handler
         REPORT
       end.join("\n")
 
-      @api.send_message(chat_id: @tguser.id, text: "ANSWERS:\n#{apitext}")
+      apitext = "+++ ANSWERS +++\n#{apitext}"
+
+      apitext.scan(/.{1,1000}/m) do |chunk|
+        @api.send_message(chat_id: @tguser.id, text: chunk.to_s)
+      end
     end
 
     def reviewstat(_rest = '')
@@ -450,6 +450,40 @@ class Handler
       end.join("\n")
 
       @api.send_message(chat_id: @tguser.id, text: "REVIEWS:\n#{apitext}")
+    end
+
+    def reviewsfor(rest = '')
+      re = /(.+)/m
+      tgid = rest.match(re).to_s
+      unless tgid
+        @api.send_message(chat_id: @tguser.id, text: 'Wrong command format: specify tgid')
+        return
+      end
+      reviews = @dbl.reviews.detailed_reviews_for_user(tgid)
+
+      apitext = reviews.map do |review|
+        revtgid = review[:reviewer]
+        dbuser = @dbl.users.get_user_by_id(revtgid)
+        <<~REVIEW
+          *Review ##{review[:id]}*
+          ---
+          *Question #{review[:question]}*
+          #{review[:text]}
+
+          *Grade*: #{review[:grade]}
+          *From*: #{dbuser.username}
+          ---
+        REVIEW
+      end.join("\n")
+
+      if reviews.empty?
+        @api.send_message(chat_id: @tguser.id, text: 'No reviews received yet')
+      else
+        @api.send_message(
+          chat_id: @tguser.id,
+          text: "*Your Reviews*\n\n#{apitext}"
+        )
+      end
     end
 
     def dumpdb(_rest = '')
