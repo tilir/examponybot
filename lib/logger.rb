@@ -25,4 +25,8 @@ class Logger
   def self.print(message)
     puts(message) if @@verbose
   end
+
+  def self.error(message)
+    puts(message)
+  end
 end

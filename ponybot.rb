@@ -56,23 +56,33 @@ def main
   Handler.new(options[:dbname]) do |handler|
     finish = false
     first = true
+
     Telegram::Bot::Client.run(options[:token]) do |bot|
       bot.listen do |event|
         next unless event.is_a?(Telegram::Bot::Types::Message)
 
-        finish = handler.process_message(bot.api, event)
-        break if finish && !first
+        begin
+          finish = handler.process_message(bot.api, event)
+          break if finish && !first
+        rescue Telegram::Bot::Exceptions::ResponseError => e
+          if e.respond_to?(:error_code) && e.error_code == 403
+            Logger.error("Telegram 403 for user_id=#{event.from&.id}: #{e.message}")
+            next
+          end
 
-        first = false
+          Logger.error("Telegram API error: #{e.message}")
+          Logger.error("Telegram API response: #{e.response}") if e.respond_to?(:response)
+          next
+        rescue StandardError => e
+          Logger.error("Unhandled error while processing update: #{e.class}: #{e.message}")
+          Logger.error(e.backtrace.join("\n"))
+          next
+        ensure
+          first = false
+        end
       end
     end
   end
-rescue DBLayerError => e
-  puts "[[DBLayerError]] #{e.message}"
-  Logger.error("Database error: #{e.backtrace.join("\n")}")
-rescue Telegram::Bot::Exceptions::ResponseError => e
-  puts "[[TelegramAPIError]] #{e.message}"
-  Logger.error("Telegram API error: #{e.response}")
 end
 
 # main program start
