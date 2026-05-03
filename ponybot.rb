@@ -51,6 +51,10 @@ def parse_options
 end
 
 def main
+  STDOUT.sync = true
+  STDERR.sync = true
+  Logger.error "DEBUG: tty=#{STDOUT.tty?}, sync=#{STDOUT.sync}"
+
   options = parse_options
   Logger.set_verbose options[:verbose]
   Handler.new(options[:dbname]) do |handler|

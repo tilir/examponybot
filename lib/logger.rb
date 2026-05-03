@@ -23,10 +23,10 @@ class Logger
   end
 
   def self.print(message)
-    puts(message) if @@verbose
+    STDOUT.puts(message) if @@verbose
   end
 
   def self.error(message)
-    puts(message)
+    STDERR.puts(message)
   end
 end
