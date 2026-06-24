@@ -179,12 +179,10 @@ class Handler
 
     def handle_error(error)
       error_location = error.backtrace_locations&.first
-      if error_location
-        file = error_location.path
-        line = error_location.lineno
-      end
+      file = error_location&.path
+      line = error_location&.lineno
 
-      error_message = <<~ERROR_MSG
+      full_message = <<~ERROR_MSG
         +++ CRASH REPORT +++
         Time: #{Time.now}
         Error: #{error.class} - #{error.message}
@@ -198,12 +196,31 @@ class Handler
         Method: #{__method__}
       ERROR_MSG
 
-      Logger.print(error_message)
+      short_message = <<~ERROR_MSG
+        +++ CRASH REPORT +++
+        Time: #{Time.now}
+        Error: #{error.class} - #{error.message}
+        Location: #{file}:#{line}
+      ERROR_MSG
 
-      @api.send_message(
-        chat_id: @tguser.id,
-        text: error_message
-      )
+      Logger.print(full_message)
+
+      begin
+        @api.send_message(
+          chat_id: @tguser.id,
+          text: short_message
+        )
+      rescue Telegram::Bot::Exceptions::ResponseError => e
+        Logger.error("Failed to send crash report to Telegram: #{e.class}: #{e.message}")
+      rescue Faraday::TimeoutError,
+             Faraday::ConnectionFailed,
+             Faraday::SSLError,
+             Net::OpenTimeout,
+             Net::ReadTimeout,
+             Errno::ECONNRESET,
+             EOFError => e
+        Logger.error("Failed to send crash report due to connection error: #{e.class}: #{e.message}")
+      end
     end
   end
 
